@@ -292,7 +292,7 @@ export class Start extends Phaser.Scene {
                 // Jump off if W was released
                 if (wJustReleased) {
                     this.player1.body.setVelocityY(this.jumpVelocity);
-                }
+    }
                 this.player1.wWasDown = false;
             } 
             // Climb up with W held
