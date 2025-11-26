@@ -7,8 +7,11 @@ Thumbs.db
 .idea/
 *.swp
 *.swo
+*~
 
-# Logs
-*.log
-npm-debug.log*
+# Node modules (if you add any later)
+node_modules/
 
+# Build outputs (if any)
+dist/
+build/

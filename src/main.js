@@ -1,8 +1,10 @@
+import { Menu } from './scenes/Menu.js';
+import { HowToPlay } from './scenes/HowToPlay.js';
 import { Start } from './scenes/Start.js';
 
 const config = {
     type: Phaser.AUTO,
-    title: 'Overlord Rising',
+    title: 'Untitled Game',
     description: '',
     parent: 'game-container',
     width: 1280,
@@ -17,6 +19,8 @@ const config = {
         }
     },
     scene: [
+        Menu,
+        HowToPlay,
         Start
     ],
     scale: {
