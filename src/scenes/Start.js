@@ -34,16 +34,16 @@ export class Start extends Phaser.Scene {
         this.player1BarBg.setOrigin(0.5, 0.5);
         this.player1BarFill = this.add.rectangle(120, 30, 0, 25, 0xFFD700); // Gold
         this.player1BarFill.setOrigin(0, 0.5);
-        this.add.text(320, 30, 'SOLARI', { fontSize: '18px', fill: '#FFD700', fontStyle: 'bold' }).setOrigin(0.5, 0.5);
         this.player1InfluenceText = this.add.text(320, 55, '0/500', { fontSize: '14px', fill: '#ffffff' }).setOrigin(0.5, 0.5);
+        this.player1NameText = this.add.text(320, 75, 'SOLARI', { fontSize: '18px', fill: '#FFD700', fontStyle: 'bold' }).setOrigin(0.5, 0.5);
         
         // Player 2 (Umbrae) influence bar
         this.player2BarBg = this.add.rectangle(960, 30, 400, 30, 0x333333);
         this.player2BarBg.setOrigin(0.5, 0.5);
         this.player2BarFill = this.add.rectangle(760, 30, 0, 25, 0x8B00FF); // Purple
         this.player2BarFill.setOrigin(0, 0.5);
-        this.add.text(960, 30, 'UMBRAE', { fontSize: '18px', fill: '#8B00FF', fontStyle: 'bold' }).setOrigin(0.5, 0.5);
         this.player2InfluenceText = this.add.text(960, 55, '0/500', { fontSize: '14px', fill: '#ffffff' }).setOrigin(0.5, 0.5);
+        this.player2NameText = this.add.text(960, 75, 'UMBRAE', { fontSize: '18px', fill: '#8B00FF', fontStyle: 'bold' }).setOrigin(0.5, 0.5);
         
         // ===== INFLUENCE MAP BLOCKS =====
         // Visual "territory" blocks on the map that reflect how many points of influence
@@ -54,93 +54,122 @@ export class Start extends Phaser.Scene {
         this.platforms = [];
         
         // Ground level platform (main floor) - compressed to fit above TV area
-        const ground = this.add.rectangle(640, 480, 1280, 80, 0x8B4513);
+        const ground = this.add.rectangle(640, 440, 1280, 80, 0x8B4513);
         ground.setOrigin(0.5, 0.5);
         this.physics.add.existing(ground, true);
         this.platforms.push(ground);
         
-        // Middle platform (for Vine Pattern Wall) - adjusted for compressed view
-        const middlePlatform = this.add.rectangle(640, 280, 400, 30, 0x654321);
+        // Middle platform (for Vine Pattern Wall) - moved down a bit but still above middle pillar
+        const middlePlatform = this.add.rectangle(640, 250, 400, 30, 0x654321);
         middlePlatform.setOrigin(0.5, 0.5);
         this.physics.add.existing(middlePlatform, true);
         this.platforms.push(middlePlatform);
         
-        // Top platform (for Wind Totem Dial) - adjusted for compressed view
-        const topPlatform = this.add.rectangle(640, 100, 300, 30, 0x654321);
+        // Top platform (for Wind Totem Dial) - moved down a bit but still above middle pillar
+        const topPlatform = this.add.rectangle(640, 70, 300, 30, 0x654321);
         topPlatform.setOrigin(0.5, 0.5);
         this.physics.add.existing(topPlatform, true);
         this.platforms.push(topPlatform);
         
-        // Additional platforms for parkour - creating a path to the top (compressed)
+        // Additional platforms for parkour - creating a path to the top (original layout)
         // Step 1: Platforms from ground to middle level
-        const leftPlatform1 = this.add.rectangle(300, 400, 150, 25, 0x654321);
+        const leftPlatform1 = this.add.rectangle(300, 360, 150, 25, 0x654321);
         leftPlatform1.setOrigin(0.5, 0.5);
         this.physics.add.existing(leftPlatform1, true);
         this.platforms.push(leftPlatform1);
         
-        const rightPlatform1 = this.add.rectangle(980, 400, 150, 25, 0x654321);
+        const rightPlatform1 = this.add.rectangle(980, 360, 150, 25, 0x654321);
         rightPlatform1.setOrigin(0.5, 0.5);
         this.physics.add.existing(rightPlatform1, true);
         this.platforms.push(rightPlatform1);
         
-        // Step 2: Platforms to reach middle platform
-        const leftPlatform2 = this.add.rectangle(400, 340, 120, 25, 0x654321);
+        // Step 2: Platforms to reach middle platform - moved down a bit but still above middle pillar
+        const leftPlatform2 = this.add.rectangle(400, 270, 120, 25, 0x654321);
         leftPlatform2.setOrigin(0.5, 0.5);
         this.physics.add.existing(leftPlatform2, true);
         this.platforms.push(leftPlatform2);
         
-        const rightPlatform2 = this.add.rectangle(880, 340, 120, 25, 0x654321);
+        const rightPlatform2 = this.add.rectangle(880, 270, 120, 25, 0x654321);
         rightPlatform2.setOrigin(0.5, 0.5);
         this.physics.add.existing(rightPlatform2, true);
         this.platforms.push(rightPlatform2);
         
-        // Step 3: Platforms from middle to top level
-        const leftPlatform3 = this.add.rectangle(450, 200, 100, 25, 0x654321);
+        // Step 3: Platforms from middle to top level - moved down a bit but still above middle pillar
+        const leftPlatform3 = this.add.rectangle(450, 130, 100, 25, 0x654321);
         leftPlatform3.setOrigin(0.5, 0.5);
         this.physics.add.existing(leftPlatform3, true);
         this.platforms.push(leftPlatform3);
         
-        const rightPlatform3 = this.add.rectangle(830, 200, 100, 25, 0x654321);
+        const rightPlatform3 = this.add.rectangle(830, 130, 100, 25, 0x654321);
         rightPlatform3.setOrigin(0.5, 0.5);
         this.physics.add.existing(rightPlatform3, true);
         this.platforms.push(rightPlatform3);
         
-        // Step 4: Final platforms to reach top platform
-        const leftPlatform4 = this.add.rectangle(500, 140, 100, 25, 0x654321);
+        // Step 4: Final platforms to reach top platform - moved down a bit but still above middle pillar
+        const leftPlatform4 = this.add.rectangle(500, 70, 100, 25, 0x654321);
         leftPlatform4.setOrigin(0.5, 0.5);
         this.physics.add.existing(leftPlatform4, true);
         this.platforms.push(leftPlatform4);
         
-        const rightPlatform4 = this.add.rectangle(780, 140, 100, 25, 0x654321);
+        const rightPlatform4 = this.add.rectangle(780, 70, 100, 25, 0x654321);
         rightPlatform4.setOrigin(0.5, 0.5);
         this.physics.add.existing(rightPlatform4, true);
         this.platforms.push(rightPlatform4);
         
         // ===== VINES (Climbable) =====
         this.vines = [];
-        // Left vine (goes from ground to top) - compressed
-        const leftVine = this.add.rectangle(100, 240, 20, 400, 0x228B22);
+        // Left vine (goes from ground to top) - moved further away from center
+        const leftVine = this.add.rectangle(50, 240, 20, 400, 0x228B22);
         leftVine.setOrigin(0.5, 0.5);
         this.physics.add.existing(leftVine, true);
         this.vines.push(leftVine);
         
-        // Right vine (goes from ground to top) - compressed
-        const rightVine = this.add.rectangle(1180, 240, 20, 400, 0x228B22);
+        // Right vine (goes from ground to top) - moved further away from center
+        const rightVine = this.add.rectangle(1230, 240, 20, 400, 0x228B22);
         rightVine.setOrigin(0.5, 0.5);
         this.physics.add.existing(rightVine, true);
         this.vines.push(rightVine);
         
-        // Center-left vine (from middle platform to top) - compressed
-        const centerLeftVine = this.add.rectangle(350, 190, 20, 180, 0x228B22);
+        // Center-left vine (from middle platform to top) - decreased length
+        const centerLeftVine = this.add.rectangle(350, 160, 20, 120, 0x228B22);
         centerLeftVine.setOrigin(0.5, 0.5);
         this.physics.add.existing(centerLeftVine, true);
         this.vines.push(centerLeftVine);
         
-        // Center-right vine (from middle platform to top) - compressed
-        const centerRightVine = this.add.rectangle(930, 190, 20, 180, 0x228B22);
+        // Center-right vine (from middle platform to top) - decreased length
+        const centerRightVine = this.add.rectangle(930, 160, 20, 120, 0x228B22);
         centerRightVine.setOrigin(0.5, 0.5);
         this.physics.add.existing(centerRightVine, true);
         this.vines.push(centerRightVine);
+        
+        // Platforms at top of side vines for runes (require W+D or Up+Right to reach)
+        // Left vine top platform (for Player 1 - requires W+D jump from vine)
+        // Moved down and RIGHT (towards center) so player can reach it
+        const leftVineTopPlatform = this.add.rectangle(130, 100, 100, 25, 0x654321);
+        leftVineTopPlatform.setOrigin(0.5, 0.5);
+        this.physics.add.existing(leftVineTopPlatform, true);
+        this.platforms.push(leftVineTopPlatform);
+        
+        // Right vine top platform (for Player 2 - requires Up+Right jump from vine)
+        // Moved down and LEFT (towards center) so player can reach it
+        const rightVineTopPlatform = this.add.rectangle(1150, 100, 100, 25, 0x654321);
+        rightVineTopPlatform.setOrigin(0.5, 0.5);
+        this.physics.add.existing(rightVineTopPlatform, true);
+        this.platforms.push(rightVineTopPlatform);
+        
+        // Platforms on side vines for pillars - positioned 2/5 up the vine
+        // Vine goes from y: 40 (top) to y: 440 (ground), so 2/5 from ground = y: 280
+        // Left vine platform (for left pillar)
+        const leftVineGroundPlatform = this.add.rectangle(130, 280, 100, 25, 0x654321);
+        leftVineGroundPlatform.setOrigin(0.5, 0.5);
+        this.physics.add.existing(leftVineGroundPlatform, true);
+        this.platforms.push(leftVineGroundPlatform);
+        
+        // Right vine platform (for right pillar)
+        const rightVineGroundPlatform = this.add.rectangle(1150, 280, 100, 25, 0x654321);
+        rightVineGroundPlatform.setOrigin(0.5, 0.5);
+        this.physics.add.existing(rightVineGroundPlatform, true);
+        this.platforms.push(rightVineGroundPlatform);
         
         // ===== TV SCREENS =====
         // Player 1 TV (left side) - resized so the Simon grid fits fully inside
@@ -165,8 +194,9 @@ export class Start extends Phaser.Scene {
         
         
         // ===== PLAYERS =====
+        // Ground top is at y=400, players are 50px tall, so spawn at y=375 (ground top - player height/2)
         // Player 1 (Solari - Light/Gold) - starts left (compressed position)
-        this.player1 = this.add.rectangle(200, 400, 50, 50, 0xFFD700);
+        this.player1 = this.add.rectangle(200, 375, 50, 50, 0xFFD700);
         this.player1.setOrigin(0.5, 0.5);
         this.physics.add.existing(this.player1);
         this.player1.body.setCollideWorldBounds(true);
@@ -179,9 +209,10 @@ export class Start extends Phaser.Scene {
         this.player1.vineIndicator = null;
         this.player1.totemIndicator = null;
         this.player1.teleporting = false; // Track if player is being teleported
+        this.player1.vineLatchCooldown = 0; // Cooldown after latching to prevent immediate jump-off
         
         // Player 2 (Umbrae - Shadow/Purple) - starts right (compressed position)
-        this.player2 = this.add.rectangle(1080, 400, 50, 50, 0x8B00FF);
+        this.player2 = this.add.rectangle(1080, 375, 50, 50, 0x8B00FF);
         this.player2.setOrigin(0.5, 0.5);
         this.physics.add.existing(this.player2);
         this.player2.body.setCollideWorldBounds(true);
@@ -194,6 +225,7 @@ export class Start extends Phaser.Scene {
         this.player2.vineIndicator = null;
         this.player2.totemIndicator = null;
         this.player2.teleporting = false; // Track if player is being teleported
+        this.player2.vineLatchCooldown = 0; // Cooldown after latching to prevent immediate jump-off
         
         // Collisions
         this.platforms.forEach(platform => {
@@ -209,8 +241,8 @@ export class Start extends Phaser.Scene {
         this.puzzleInfluence.vineFlowSolari = 0;
         this.puzzleInfluence.vineFlowUmbrae = 0;
         
-        // 1. Drum Rhythm Pads (Ground Level) - +1 influence/sec
-        this.createDrumPads();
+        // 1. Forest Runes System - collect runes via parkour, place in pillars
+        this.createForestRunes();
         
         // 2. Vine Flow Puzzle (Middle Platform) - +2 influence/sec
         this.createVineFlowPuzzle();
@@ -234,7 +266,7 @@ export class Start extends Phaser.Scene {
         
         // ===== MOVEMENT SETTINGS =====
         this.playerSpeed = 200;
-        this.jumpVelocity = -500;
+        this.jumpVelocity = -550; // Slightly higher jump for harder parkour
         this.climbSpeed = 200; // Constant velocity for climbing
         // Initialize vine climb speed (can be modified by debuffs)
         this.player1.vineClimbSpeed = this.climbSpeed;
@@ -243,36 +275,119 @@ export class Start extends Phaser.Scene {
         // ===== LEVEL TIMER =====
         this.levelTime = 0;
         this.levelDuration = 300; // 5 minutes in seconds
-        this.timeText = this.add.text(640, 70, '5:00', { fontSize: '24px', fill: '#ffffff' }).setOrigin(0.5, 0.5);
+        // Timer moved to center middle area
+        this.timeText = this.add.text(640, 110, '5:00', { fontSize: '24px', fill: '#ffffff' }).setOrigin(0.5, 0.5);
         
         // ===== INFLUENCE SYSTEM =====
         this.influenceRate = 0; // Net influence per second
     }
 
-    createDrumPads() {
-        // Create 4 rhythm pads at ground level
-        const padPositions = [400, 500, 600, 700];
-        this.drumPads = [];
-        this.drumPadsSequence = [0, 1, 2, 3]; // Shared sequence for all pads
-        this.drumPadsCurrentStep = 0; // Shared step counter
+    createForestRunes() {
+        // Create 3 pillars
+        // Left and right pillars on new platforms near ground on the side vines
+        // Middle pillar stays in the center
+        this.runesPillars = [];
+        const pillarPositions = [
+            { x: 130, y: 217 },   // Left pillar on left vine platform (platform top at y: 267.5, pillar bottom at y: 267 sits on it)
+            { x: 640, y: 350 },   // Middle pillar (center of screen, on ground)
+            { x: 1150, y: 217 }   // Right pillar on right vine platform (platform top at y: 267.5, pillar bottom at y: 267 sits on it)
+        ];
         
-        padPositions.forEach((x, index) => {
-            const pad = this.add.rectangle(x, 640, 60, 30, 0x666666);
-            pad.setOrigin(0.5, 0.5);
-            pad.padIndex = index;
-            pad.activated = false;
-            pad.owner = null;
-            pad.glow = this.add.circle(x, 640, 30, 0xffffff, 0);
-            this.drumPads.push(pad);
+        pillarPositions.forEach((pos, index) => {
+            // Large, visible pillar
+            const pillar = this.add.rectangle(pos.x, pos.y, 80, 100, 0x5a5a5a);
+            pillar.setOrigin(0.5, 0.5);
+            pillar.setStrokeStyle(4, 0xaaaaaa);
+            pillar.setDepth(15); // Make sure it's visible
+            pillar.pillarIndex = index;
+            pillar.hasRune = false;
+            pillar.owner = null;
+            
+            // Glow effect
+            pillar.glow = this.add.circle(pos.x, pos.y, 45, 0xffffff, 0);
+            pillar.glow.setAlpha(0);
+            pillar.glow.setDepth(16);
+            
+            this.runesPillars.push(pillar);
         });
         
-        this.puzzleNodes.drumPads = this.drumPads;
+        // Create 3 rune spawn locations (left, middle, right)
+        this.runes = [];
+        
+        // Left rune - on left vine top platform (requires W+D to reach)
+        const leftRune = this.add.circle(130, 75, 20, 0x8B4513); // Brown/tan rune
+        leftRune.setStrokeStyle(2, 0xFFD700); // Gold border
+        leftRune.setOrigin(0.5, 0.5);
+        leftRune.runeIndex = 0;
+        leftRune.collected = false;
+        leftRune.glow = this.add.circle(130, 75, 25, 0xFFD700, 0.3);
+        leftRune.glow.setOrigin(0.5, 0.5);
+        this.runes.push(leftRune);
+        
+        // Right rune - on right vine top platform (requires Up+Right to reach)
+        const rightRune = this.add.circle(1150, 75, 20, 0x8B4513); // Brown/tan rune
+        rightRune.setStrokeStyle(2, 0xFFD700); // Gold border
+        rightRune.setOrigin(0.5, 0.5);
+        rightRune.runeIndex = 2;
+        rightRune.collected = false;
+        rightRune.glow = this.add.circle(1150, 75, 25, 0xFFD700, 0.3);
+        rightRune.glow.setOrigin(0.5, 0.5);
+        this.runes.push(rightRune);
+        
+        // Middle rune - spawns randomly after 25 seconds
+        const middleRune = this.add.circle(640, 75, 20, 0x8B4513); // Brown/tan rune
+        middleRune.setStrokeStyle(2, 0xFFD700); // Gold border
+        middleRune.setOrigin(0.5, 0.5);
+        middleRune.runeIndex = 1;
+        middleRune.collected = false;
+        middleRune.glow = this.add.circle(640, 75, 25, 0xFFD700, 0.3);
+        middleRune.glow.setOrigin(0.5, 0.5);
+        middleRune.setVisible(false); // Start hidden
+        middleRune.glow.setVisible(false);
+        this.runes.push(middleRune);
+        
+        // Middle rune spawn system
+        this.middleRuneSpawnTimer = 25; // 25 seconds until spawn
+        this.middleRuneSpawned = false;
+        // Timer positioned in center middle area, below level timer
+        this.middleRuneTimerText = this.add.text(640, 140, 'Rune: 25s', {
+            fontSize: '18px',
+            fill: '#ffff00',
+            fontStyle: 'bold',
+            stroke: '#000000',
+            strokeThickness: 3
+        }).setOrigin(0.5, 0.5);
+        this.middleRuneTimerText.setDepth(100); // Make sure it's visible
+        
+        // List of reachable platform positions for random middle rune spawn
+        // Positions are on TOP of platforms (platform top surface - rune radius to sit on platform)
+        // Platform top = center Y - (height/2), Rune sits at top - 15 (so it's visible on platform)
+        this.reachablePlatformPositions = [
+            { x: 300, y: 332 },   // leftPlatform1 (top: 360-12.5=347.5, rune: 347.5-15=332.5)
+            { x: 980, y: 332 },   // rightPlatform1 (top: 360-12.5=347.5, rune: 347.5-15=332.5)
+            { x: 400, y: 242 },   // leftPlatform2 (top: 270-12.5=257.5, rune: 257.5-15=242.5) - moved down
+            { x: 880, y: 242 },   // rightPlatform2 (top: 270-12.5=257.5, rune: 257.5-15=242.5) - moved down
+            { x: 450, y: 102 },   // leftPlatform3 (top: 130-12.5=117.5, rune: 117.5-15=102.5) - moved down
+            { x: 830, y: 102 },   // rightPlatform3 (top: 130-12.5=117.5, rune: 117.5-15=102.5) - moved down
+            { x: 500, y: 42 },    // leftPlatform4 (top: 70-12.5=57.5, rune: 57.5-15=42.5) - moved down
+            { x: 780, y: 42 },    // rightPlatform4 (top: 70-12.5=57.5, rune: 57.5-15=42.5) - moved down
+            { x: 640, y: 220 },   // middlePlatform (top: 250-15=235, rune: 235-15=220) - moved down, still above pillar top at y: 300
+            { x: 640, y: 40 },    // topPlatform (top: 70-15=55, rune: 55-15=40) - moved down
+            { x: 130, y: 72 },    // leftVineTopPlatform (top: 100-12.5=87.5, rune: 87.5-15=72.5) - adjusted for new position
+            { x: 1150, y: 72 }    // rightVineTopPlatform (top: 100-12.5=87.5, rune: 87.5-15=72.5) - adjusted for new position
+        ];
+        
+        // Track which player is carrying which rune
+        this.player1.carriedRune = null;
+        this.player2.carriedRune = null;
+        
+        this.puzzleNodes.forestRunes = this.runesPillars;
     }
 
     createVineFlowPuzzle() {
         // Create vine indicator on middle platform - a wall of vines
         const vineWallX = 640; // Center of middle platform
-        const vineWallY = 280; // Middle platform Y position
+        const vineWallY = 250; // Middle platform Y position (moved down a bit but still above middle pillar)
         
         // Create a vine wall structure as the indicator
         this.vineFlowIndicator = this.add.container(vineWallX, vineWallY);
@@ -350,13 +465,13 @@ export class Start extends Phaser.Scene {
         container.setAlpha(0);
         game.container = container;
         
-        const gameSize = 220; // Slightly larger to fit 7 vines
+        const gameSize = 200; // Fits better in TV screen
         const numVines = 7;
         const vineSpacing = gameSize / (numVines + 1);
-        const vineSize = 25; // Slightly smaller to fit 7
+        const vineSize = 22; // Slightly smaller to fit better
         
-        // Background (much taller to fit all text without cutoff)
-        const bgHeight = gameSize + 300; // Extra tall to ensure no cutoff
+        // Background - sized to fit in TV (TV is 500x220, so keep it compact)
+        const bgHeight = 200; // Compact height to fit in TV
         const bg = this.add.rectangle(0, 0, gameSize + 20, bgHeight, game.baseColor);
         bg.setStrokeStyle(3, 0xffffff);
         container.add(bg);
@@ -367,7 +482,7 @@ export class Start extends Phaser.Scene {
         const vineState = [];
         for (let i = 0; i < numVines; i++) {
             const x = -gameSize/2 + (i + 1) * vineSpacing;
-            const y = -30; // Move vines up to make room for text
+            const y = -40; // Move vines up to make room for text
             
             // Create vine tile (leaf)
             const vine = this.add.rectangle(x, y, vineSize, vineSize, game.offColor);
@@ -389,14 +504,14 @@ export class Start extends Phaser.Scene {
         
         // Key hint (showing which keys to use) - above vines
         const keyHint = playerFaction === 'Solari' 
-            ? this.add.text(0, -gameSize/2 - 50, 'Keys: 1 2 3 4 5 6 7', {
-                fontSize: '12px',
+            ? this.add.text(0, -70, 'Keys: 1 2 3 4 5 6 7', {
+                fontSize: '14px',
                 fill: '#ffffff',
                 align: 'center',
                 fontStyle: 'bold'
             })
-            : this.add.text(0, -gameSize/2 - 50, 'Keys: 4 5 6 7 8 9 0', {
-                fontSize: '12px',
+            : this.add.text(0, -70, 'Keys: 4 5 6 7 8 9 0', {
+                fontSize: '14px',
                 fill: '#ffffff',
                 align: 'center',
                 fontStyle: 'bold'
@@ -406,11 +521,12 @@ export class Start extends Phaser.Scene {
         game.keyHint = keyHint;
 
         // Timer text (below vines, before instructions)
-        const timerText = this.add.text(0, 20, '15', {
-            fontSize: '18px',
+        const timerText = this.add.text(0, 5, '15', {
+            fontSize: '16px',
             fill: '#ffff00',
             fontStyle: 'bold'
         }).setOrigin(0.5, 0.5);
+        timerText.setVisible(false); // Hide until minigame actually starts
         container.add(timerText);
         game.timerText = timerText;
         
@@ -419,8 +535,8 @@ export class Start extends Phaser.Scene {
             ? 'Light ALL vines ON (Sun rewards you!)' 
             : 'Light ALL vines ON (Darkness rewards you!)';
         const keyText = playerFaction === 'Solari' ? '1-7' : '4-0';
-        const instructionText = this.add.text(0, 60, `HOW TO PLAY:\nPress keys ${keyText} to toggle vines.\nEach press affects that vine and its neighbors.\n${goalText}`, {
-            fontSize: '8px',
+        const instructionText = this.add.text(0, 50, `HOW TO PLAY:\nPress keys ${keyText} to toggle vines.\nEach press affects that vine and its neighbors.\n${goalText}`, {
+            fontSize: '10px',
             fill: '#ffffff',
             align: 'center',
             wordWrap: { width: gameSize - 10 }
@@ -428,27 +544,31 @@ export class Start extends Phaser.Scene {
         container.add(instructionText);
         game.instructionText = instructionText;
         
-        // Status text (positioned at the very bottom, well within background)
-        const statusText = this.add.text(0, bgHeight/2 - 20, '', {
-            fontSize: '11px',
+        // Status text - add directly to scene, not container, so it's always visible
+        // Position it at the bottom of the visible TV screen area (centerY is 600, TV goes to y=710)
+        const statusText = this.add.text(centerX, centerY + 85, '', {
+            fontSize: '12px',
             fill: '#ffff00',
-            fontStyle: 'bold'
+            fontStyle: 'bold',
+            stroke: '#000000',
+            strokeThickness: 2
         }).setOrigin(0.5, 0.5);
-        container.add(statusText);
+        statusText.setVisible(false); // Start hidden, show when needed
+        statusText.setDepth(200); // Make sure it's on top of everything
         game.statusText = statusText;
         
         return game;
     }
 
     createWindTotemDial() {
-        // Create Wind Totem (Minecraft Totem of Undying style) - compressed position
+        // Create Wind Totem (Minecraft Totem of Undying style) - moved down a bit but still above middle pillar
         // Main totem body - rectangular with face
-        this.windTotem = this.add.rectangle(640, 85, 40, 50, 0x8B7355); // Brown/tan color
+        this.windTotem = this.add.rectangle(640, 55, 40, 50, 0x8B7355); // Brown/tan color
         this.windTotem.setOrigin(0.5, 0.5);
         this.windTotem.setStrokeStyle(2, 0x654321);
         
         // Totem face details
-        const faceY = 80;
+        const faceY = 50;
         // Eyes
         this.add.circle(630, faceY, 3, 0x000000);
         this.add.circle(650, faceY, 3, 0x000000);
@@ -670,12 +790,20 @@ export class Start extends Phaser.Scene {
         
         // Check level end conditions
         if (remaining <= 0) {
-            this.endLevel();
+            // Timer ran out - determine winner by who has most influence
+            let winner = null;
+            if (this.player1Influence > this.player2Influence) {
+                winner = 'Solari';
+            } else if (this.player2Influence > this.player1Influence) {
+                winner = 'Umbrae';
+            }
+            // If tied, winner stays null (NO RESULT)
+            this.endLevel(winner);
             return;
         }
         
         // Update puzzle nodes
-        this.updateDrumPads();
+        this.updateForestRunes();
         this.updateVineFlowPuzzle();
         this.updateWindTotem();
         
@@ -689,6 +817,37 @@ export class Start extends Phaser.Scene {
         // Check climbing
         this.checkClimbing(this.player1);
         this.checkClimbing(this.player2);
+        
+        // Visual feedback for carried runes
+        this.updateRuneIndicators();
+    }
+    
+    updateRuneIndicators() {
+        // Player 1 rune indicator
+        if (this.player1.carriedRune !== null) {
+            if (!this.player1.runeIndicator) {
+                this.player1.runeIndicator = this.add.circle(this.player1.x, this.player1.y - 40, 15, 0xFFD700, 0.8);
+                this.player1.runeIndicator.setStrokeStyle(2, 0xFFFFFF);
+            } else {
+                this.player1.runeIndicator.setPosition(this.player1.x, this.player1.y - 40);
+                this.player1.runeIndicator.setVisible(true);
+            }
+        } else if (this.player1.runeIndicator) {
+            this.player1.runeIndicator.setVisible(false);
+        }
+        
+        // Player 2 rune indicator
+        if (this.player2.carriedRune !== null) {
+            if (!this.player2.runeIndicator) {
+                this.player2.runeIndicator = this.add.circle(this.player2.x, this.player2.y - 40, 15, 0x8B00FF, 0.8);
+                this.player2.runeIndicator.setStrokeStyle(2, 0xFFFFFF);
+            } else {
+                this.player2.runeIndicator.setPosition(this.player2.x, this.player2.y - 40);
+                this.player2.runeIndicator.setVisible(true);
+            }
+        } else if (this.player2.runeIndicator) {
+            this.player2.runeIndicator.setVisible(false);
+        }
     }
 
     updatePlayer1() {
@@ -703,10 +862,13 @@ export class Start extends Phaser.Scene {
         const wHeld = this.cursorsWASD.W.isDown;
         const sPressed = Phaser.Input.Keyboard.JustDown(this.sKey);
         const spacePressed = Phaser.Input.Keyboard.JustDown(this.spaceKey);
+        const aPressed = Phaser.Input.Keyboard.JustDown(this.cursorsWASD.A);
+        const dPressed = Phaser.Input.Keyboard.JustDown(this.cursorsWASD.D);
         
         // Check if we should latch onto vine (W pressed when near vine but not latched)
         if (wPressed && !this.player1.latchedToVine && this.player1.climbing && this.player1.onVine) {
             this.player1.latchedToVine = true;
+            this.player1.vineLatchCooldown = 0.15; // 0.15 second cooldown before can jump off
             // Don't set gravity here - let the update logic handle it based on input
             this.player1.body.setVelocityY(0);
             this.player1.body.setVelocityX(0);
@@ -728,17 +890,16 @@ export class Start extends Phaser.Scene {
                 this.player1.vineIndicator.setVisible(false);
             }
             
-            // Check for unlatch: Space to jump off, or S to drop down
-            if (spacePressed) {
-                // Jump off vine
-                this.player1.latchedToVine = false;
-                this.player1.climbing = false;
-                this.player1.onVine = null;
-                this.player1.body.setAllowGravity(true);
-                this.player1.body.setGravityY(600);
-                this.player1.body.setVelocityY(this.jumpVelocity);
-                this.player1.wWasDown = false;
-            } else if (sPressed) {
+            // Update latch cooldown
+            if (this.player1.vineLatchCooldown > 0) {
+                this.player1.vineLatchCooldown -= 1/60; // Decrement by frame time (assuming 60 FPS)
+                if (this.player1.vineLatchCooldown < 0) {
+                    this.player1.vineLatchCooldown = 0;
+                }
+            }
+            
+            // Check for unlatch: S to drop down
+            if (sPressed) {
                 // Drop down from vine (no jump)
                 this.player1.latchedToVine = false;
                 this.player1.climbing = false;
@@ -746,8 +907,29 @@ export class Start extends Phaser.Scene {
                 this.player1.body.setAllowGravity(true);
                 this.player1.body.setGravityY(600);
                 this.player1.wWasDown = false;
+                this.player1.vineLatchCooldown = 0;
             } 
-            // Climb up with W held (or pressed - allows continuous climbing)
+            // Check for jump off: W + A or W + D (works if either key is just pressed while other is held, AND cooldown is over)
+            const wAndA = (wPressed && this.cursorsWASD.A.isDown) || (wHeld && aPressed);
+            const wAndD = (wPressed && this.cursorsWASD.D.isDown) || (wHeld && dPressed);
+            
+            if ((wAndA || wAndD) && this.player1.vineLatchCooldown <= 0) {
+                // Jump off vine in direction (W + movement key)
+                this.player1.latchedToVine = false;
+                this.player1.climbing = false;
+                this.player1.onVine = null;
+                this.player1.body.setAllowGravity(true);
+                this.player1.body.setGravityY(600);
+                this.player1.body.setVelocityY(this.jumpVelocity);
+                // Add horizontal velocity based on direction
+                if (wAndA || this.cursorsWASD.A.isDown) {
+                    this.player1.body.setVelocityX(-200); // Jump left
+                } else if (wAndD || this.cursorsWASD.D.isDown) {
+                    this.player1.body.setVelocityX(200); // Jump right
+                }
+                this.player1.wWasDown = false;
+            }
+            // Climb up with W held or pressed (smooth continuous climbing - W alone does NOT jump)
             else if (wHeld || wPressed) {
                 this.player1.body.setGravityY(0);
                 this.player1.body.setAllowGravity(false);
@@ -812,10 +994,13 @@ export class Start extends Phaser.Scene {
         const upHeld = this.cursorsArrows.up.isDown;
         const downPressed = Phaser.Input.Keyboard.JustDown(this.downKey);
         const enterPressed = Phaser.Input.Keyboard.JustDown(this.enterKey);
+        const leftPressed = Phaser.Input.Keyboard.JustDown(this.cursorsArrows.left);
+        const rightPressed = Phaser.Input.Keyboard.JustDown(this.cursorsArrows.right);
         
         // Check if we should latch onto vine (Up Arrow pressed when near vine but not latched)
         if (upPressed && !this.player2.latchedToVine && this.player2.climbing && this.player2.onVine) {
             this.player2.latchedToVine = true;
+            this.player2.vineLatchCooldown = 0.15; // 0.15 second cooldown before can jump off
             // Don't set gravity here - let the update logic handle it based on input
             this.player2.body.setVelocityY(0);
             this.player2.body.setVelocityX(0);
@@ -837,17 +1022,16 @@ export class Start extends Phaser.Scene {
                 this.player2.vineIndicator.setVisible(false);
             }
             
-            // Check for unlatch: ENTER to jump off, or Down Arrow to drop down
-            if (enterPressed) {
-                // Jump off vine
-                this.player2.latchedToVine = false;
-                this.player2.climbing = false;
-                this.player2.onVine = null;
-                this.player2.body.setAllowGravity(true);
-                this.player2.body.setGravityY(600);
-                this.player2.body.setVelocityY(this.jumpVelocity);
-                this.player2.upWasDown = false;
-            } else if (downPressed) {
+            // Update latch cooldown
+            if (this.player2.vineLatchCooldown > 0) {
+                this.player2.vineLatchCooldown -= 1/60; // Decrement by frame time (assuming 60 FPS)
+                if (this.player2.vineLatchCooldown < 0) {
+                    this.player2.vineLatchCooldown = 0;
+                }
+            }
+            
+            // Check for unlatch: Down to drop down
+            if (downPressed) {
                 // Drop down from vine (no jump)
                 this.player2.latchedToVine = false;
                 this.player2.climbing = false;
@@ -855,8 +1039,29 @@ export class Start extends Phaser.Scene {
                 this.player2.body.setAllowGravity(true);
                 this.player2.body.setGravityY(600);
                 this.player2.upWasDown = false;
+                this.player2.vineLatchCooldown = 0;
             } 
-            // Climb up with Up Arrow held (or pressed - allows continuous climbing)
+            // Check for jump off: Up + Left or Up + Right (works if either key is just pressed while other is held, AND cooldown is over)
+            const upAndLeft = (upPressed && this.cursorsArrows.left.isDown) || (upHeld && leftPressed);
+            const upAndRight = (upPressed && this.cursorsArrows.right.isDown) || (upHeld && rightPressed);
+            
+            if ((upAndLeft || upAndRight) && this.player2.vineLatchCooldown <= 0) {
+                // Jump off vine in direction (Up + movement key)
+                this.player2.latchedToVine = false;
+                this.player2.climbing = false;
+                this.player2.onVine = null;
+                this.player2.body.setAllowGravity(true);
+                this.player2.body.setGravityY(600);
+                this.player2.body.setVelocityY(this.jumpVelocity);
+                // Add horizontal velocity based on direction
+                if (upAndLeft || this.cursorsArrows.left.isDown) {
+                    this.player2.body.setVelocityX(-200); // Jump left
+                } else if (upAndRight || this.cursorsArrows.right.isDown) {
+                    this.player2.body.setVelocityX(200); // Jump right
+                }
+                this.player2.upWasDown = false;
+            }
+            // Climb up with Up Arrow held or pressed (smooth continuous climbing - Up alone does NOT jump)
             else if (upHeld || upPressed) {
                 this.player2.body.setGravityY(0);
                 this.player2.body.setAllowGravity(false);
@@ -972,84 +1177,145 @@ export class Start extends Phaser.Scene {
         }
     }
 
-    updateDrumPads() {
-        // Shared rhythm pattern for all pads
-        if (!this.drumPadsSharedTimer) this.drumPadsSharedTimer = 0;
-        this.drumPadsSharedTimer += 1/60;
+    updateForestRunes() {
+        if (!this.runes || !this.runesPillars) return;
         
-        // Check if all pads are activated
-        let activePads = 0;
-        let ownerFaction = null;
-        
-        this.drumPads.forEach((pad, index) => {
-            // Check if player is on pad
-            const p1OnPad = Phaser.Math.Distance.Between(this.player1.x, this.player1.y, pad.x, pad.y) < 50;
-            const p2OnPad = Phaser.Math.Distance.Between(this.player2.x, this.player2.y, pad.x, pad.y) < 50;
-            
-            // Glow effect for rhythm (all pads sync)
-            const beatPhase = Math.sin(this.drumPadsSharedTimer * 4);
-            const expectedPadIndex = this.drumPadsSequence[this.drumPadsCurrentStep];
-            
-            // Highlight the expected pad
-            if (pad.padIndex === expectedPadIndex) {
-                if (beatPhase > 0.7) {
-                    pad.glow.setAlpha(0.8);
-                    pad.glow.setFillStyle(0xffff00);
-                } else {
-                    pad.glow.setAlpha(0.3);
-                    pad.glow.setFillStyle(0xffffff);
-                }
+        // Update middle rune spawn timer
+        const middleRune = this.runes[1]; // Middle rune is index 1
+        if (!this.middleRuneSpawned && middleRune) {
+            this.middleRuneSpawnTimer -= 1/60; // Decrement by frame time (60 FPS)
+            if (this.middleRuneSpawnTimer <= 0) {
+                this.middleRuneSpawnTimer = 0;
+                // Spawn middle rune at random reachable platform position
+                const randomPos = Phaser.Utils.Array.GetRandom(this.reachablePlatformPositions);
+                middleRune.x = randomPos.x;
+                middleRune.y = randomPos.y;
+                middleRune.glow.x = randomPos.x;
+                middleRune.glow.y = randomPos.y;
+                middleRune.setVisible(true);
+                middleRune.glow.setVisible(true);
+                middleRune.collected = false;
+                this.middleRuneSpawned = true;
+                this.middleRuneTimerText.setVisible(false);
             } else {
-                pad.glow.setAlpha(0.1);
+                // Update timer text
+                const seconds = Math.ceil(this.middleRuneSpawnTimer);
+                this.middleRuneTimerText.setText(`Rune: ${seconds}s`);
+            }
+        }
+        
+        // Update rune collection - players walk into runes to pick them up
+        this.runes.forEach((rune, index) => {
+            // Skip if rune is not visible (middle rune before spawn)
+            if (!rune.visible) {
+                return;
             }
             
-            // Check activation - step on pad when it glows and it's the correct one
-            if ((p1OnPad || p2OnPad) && beatPhase > 0.7 && pad.padIndex === expectedPadIndex) {
-                const player = p1OnPad ? this.player1 : this.player2;
-                
-                // Correct pad in sequence!
-                pad.activated = true;
-                pad.owner = player.faction;
-                pad.setFillStyle(player.faction === 'Solari' ? 0xFFD700 : 0x8B00FF);
-                pad.glow.setFillStyle(player.faction === 'Solari' ? 0xFFD700 : 0x8B00FF);
-                pad.glow.setAlpha(0.9);
-                
-                this.drumPadsCurrentStep++;
-                
-                if (this.drumPadsCurrentStep >= this.drumPadsSequence.length) {
-                    // All pads completed in sequence!
-                    ownerFaction = player.faction;
-                    // Reset sequence after completion
-                    this.time.delayedCall(3000, () => {
-                        this.drumPads.forEach(p => {
-                            p.activated = false;
-                            p.setFillStyle(0x666666);
-                        });
-                        this.drumPadsCurrentStep = 0;
-                    });
-                }
-            } else if ((p1OnPad || p2OnPad) && pad.padIndex !== expectedPadIndex) {
-                // Wrong pad - reset sequence
-                this.drumPads.forEach(p => {
-                    p.activated = false;
-                    p.setFillStyle(0x666666);
-                });
-                this.drumPadsCurrentStep = 0;
+            if (rune.collected) {
+                rune.setVisible(false);
+                rune.glow.setVisible(false);
+                return;
             }
             
-            // Count activated pads
-            if (pad.activated) {
-                activePads++;
-                if (!ownerFaction) ownerFaction = pad.owner;
+            // Check if players are near the rune
+            const p1Near = Phaser.Math.Distance.Between(this.player1.x, this.player1.y, rune.x, rune.y) < 30;
+            const p2Near = Phaser.Math.Distance.Between(this.player2.x, this.player2.y, rune.x, rune.y) < 30;
+            
+            // Player walks into rune to collect it
+            if (p1Near && !this.player1.carriedRune) {
+                rune.collected = true;
+                this.player1.carriedRune = rune.runeIndex;
+                rune.setVisible(false);
+                rune.glow.setVisible(false);
+            } else if (p2Near && !this.player2.carriedRune) {
+                rune.collected = true;
+                this.player2.carriedRune = rune.runeIndex;
+                rune.setVisible(false);
+                rune.glow.setVisible(false);
             }
         });
         
-        // Set influence if all pads are activated by same faction
-        if (activePads === this.drumPads.length && ownerFaction) {
-            this.puzzleInfluence.drumPads = ownerFaction === 'Solari' ? 1 : -1;
+        // Update pillar placement - players press W/Up arrow near pillar to place rune
+        this.runesPillars.forEach((pillar, index) => {
+            const p1Near = Phaser.Math.Distance.Between(this.player1.x, this.player1.y, pillar.x, pillar.y) < 60;
+            const p2Near = Phaser.Math.Distance.Between(this.player2.x, this.player2.y, pillar.x, pillar.y) < 60;
+            
+            // Player 1 places rune (can contest existing runes)
+            if (p1Near && this.player1.carriedRune !== null && this.player1.carriedRune === index) {
+                const wPressed = Phaser.Input.Keyboard.JustDown(this.wKey);
+                if (wPressed) {
+                    pillar.hasRune = true;
+                    pillar.owner = this.player1.faction;
+                    pillar.setFillStyle(0xFFD700); // Gold for Solari
+                    pillar.glow.setFillStyle(0xFFD700);
+                    pillar.glow.setAlpha(0.6);
+                    this.player1.carriedRune = null;
+                    // Only middle rune respawns (randomly after 25s)
+                    if (index === 1) {
+                        // Middle rune - respawn randomly after 25 seconds
+                        this.middleRuneSpawned = false;
+                        this.middleRuneSpawnTimer = 25;
+                        this.middleRuneTimerText.setVisible(true);
+                        const rune = this.runes[index];
+                        rune.setVisible(false);
+                        rune.glow.setVisible(false);
+                    }
+                    // Left/Right runes do NOT respawn - they are one-time collectibles
+                }
+            }
+            
+            // Player 2 places rune (can contest existing runes)
+            if (p2Near && this.player2.carriedRune !== null && this.player2.carriedRune === index) {
+                const upPressed = Phaser.Input.Keyboard.JustDown(this.upKey);
+                if (upPressed) {
+                    pillar.hasRune = true;
+                    pillar.owner = this.player2.faction;
+                    pillar.setFillStyle(0x8B00FF); // Purple for Umbrae
+                    pillar.glow.setFillStyle(0x8B00FF);
+                    pillar.glow.setAlpha(0.6);
+                    this.player2.carriedRune = null;
+                    // Only middle rune respawns (randomly after 25s)
+                    if (index === 1) {
+                        // Middle rune - respawn randomly after 25 seconds
+                        this.middleRuneSpawned = false;
+                        this.middleRuneSpawnTimer = 25;
+                        this.middleRuneTimerText.setVisible(true);
+                        const rune = this.runes[index];
+                        rune.setVisible(false);
+                        rune.glow.setVisible(false);
+                    }
+                    // Left/Right runes do NOT respawn - they are one-time collectibles
+                }
+            }
+            
+            // Visual feedback - show glow when player is near with correct rune
+            if ((p1Near && this.player1.carriedRune === index) || (p2Near && this.player2.carriedRune === index)) {
+                pillar.glow.setAlpha(0.4);
+                pillar.glow.setFillStyle(0xffff00); // Yellow hint
+            } else if (!pillar.hasRune) {
+                pillar.glow.setAlpha(0);
+            }
+        });
+        
+        // Calculate influence based on pillars owned
+        let solariPillars = 0;
+        let umbraePillars = 0;
+        
+        this.runesPillars.forEach(pillar => {
+            if (pillar.hasRune && pillar.owner === 'Solari') {
+                solariPillars++;
+            } else if (pillar.hasRune && pillar.owner === 'Umbrae') {
+                umbraePillars++;
+            }
+        });
+        
+        // Set influence: 2/sec (1 pillar), 4/sec (2), 6/sec (3)
+        if (solariPillars > 0) {
+            this.puzzleInfluence.forestRunes = solariPillars * 2;
+        } else if (umbraePillars > 0) {
+            this.puzzleInfluence.forestRunes = -(umbraePillars * 2);
         } else {
-            // Reset if not all pads are activated
-            this.puzzleInfluence.drumPads = 0;
+            this.puzzleInfluence.forestRunes = 0;
         }
     }
 
@@ -1993,8 +2259,13 @@ export class Start extends Phaser.Scene {
                     // All vines are back to opponent color - punishment
                     game.phase = 'done';
                     game.completed = false;
-                    game.statusText.setText('FAILED! All vines back to opponent color!');
-                    game.statusText.setFill('#ff0000');
+                    if (game.statusText) {
+                        game.statusText.setText('WRONG! The vines resist your touch.');
+                        game.statusText.setFill('#ff0000');
+                        game.statusText.setVisible(true);
+                        game.statusText.setDepth(200);
+                        game.statusText.setAlpha(1);
+                    }
                     this.time.delayedCall(2000, () => this.endLightsOut(game, false));
                     return;
                 }
@@ -2025,6 +2296,10 @@ export class Start extends Phaser.Scene {
         if (!game) return;
         
         game.active = false;
+        // Hide timer text when game ends
+        if (game.timerText) {
+            game.timerText.setVisible(false);
+        }
         if (game.container) {
             if (game.container.visible) {
                 this.tweens.add({
@@ -2045,8 +2320,9 @@ export class Start extends Phaser.Scene {
         if (game.instructionText) {
             game.instructionText.setText('');
         }
+        // Hide status text when game ends
         if (game.statusText) {
-            game.statusText.setText('');
+            game.statusText.setVisible(false);
         }
     }
     
@@ -2069,6 +2345,11 @@ export class Start extends Phaser.Scene {
                 game.phase = 'playing';
                 const goalText = game.playerFaction === 'Solari' ? 'Turn ALL lights ON' : 'Turn ALL lights OFF';
                 game.instructionText.setText(`Goal: ${goalText}`);
+                // Show timer text when game actually starts
+                if (game.timerText) {
+                    game.timerText.setVisible(true);
+                    game.timerText.setText('15');
+                }
             }
             return;
         }
@@ -2093,8 +2374,13 @@ export class Start extends Phaser.Scene {
             if (game.timer <= 0) {
                 game.phase = 'done';
                 game.completed = false;
-                game.statusText.setText('TIME UP! You failed!');
-                game.statusText.setFill('#ff0000');
+                if (game.statusText) {
+                    game.statusText.setText('TIME UP! The forest rejects your pattern.');
+                    game.statusText.setFill('#ff0000');
+                    game.statusText.setVisible(true);
+                    game.statusText.setDepth(200);
+                    game.statusText.setAlpha(1);
+                }
                 this.time.delayedCall(2000, () => this.endLightsOut(game, false));
                 return;
             }
@@ -2148,10 +2434,15 @@ export class Start extends Phaser.Scene {
                         game.phase = 'done';
                         game.completed = true;
                         const rewardText = game.playerFaction === 'Solari' 
-                            ? 'PERFECT! Sun rewards you!' 
-                            : 'PERFECT! Darkness rewards you!';
-                        game.statusText.setText(rewardText);
-                        game.statusText.setFill('#00ff00');
+                            ? 'PERFECT! The vines answer to the Sun.' 
+                            : 'PERFECT! The vines answer to Darkness.';
+                        if (game.statusText) {
+                            game.statusText.setText(rewardText);
+                            game.statusText.setFill('#00ff00');
+                            game.statusText.setVisible(true);
+                            game.statusText.setDepth(200);
+                            game.statusText.setAlpha(1);
+                        }
                         this.time.delayedCall(2000, () => this.endLightsOut(game, true));
                     }
                     break;
@@ -2238,12 +2529,12 @@ export class Start extends Phaser.Scene {
             umbraeInfluencePerSec += this.puzzleInfluence.windTotemUmbrae;
         }
         
-        // Drum Pads influence (if implemented)
-        if (this.puzzleInfluence.drumPads) {
-            if (this.puzzleInfluence.drumPads > 0) {
-                solariInfluencePerSec += this.puzzleInfluence.drumPads;
+        // Forest Runes influence (2/sec per pillar: 1=2, 2=4, 3=6)
+        if (this.puzzleInfluence.forestRunes) {
+            if (this.puzzleInfluence.forestRunes > 0) {
+                solariInfluencePerSec += this.puzzleInfluence.forestRunes;
             } else {
-                umbraeInfluencePerSec += Math.abs(this.puzzleInfluence.drumPads);
+                umbraeInfluencePerSec += Math.abs(this.puzzleInfluence.forestRunes);
             }
         }
         
