@@ -206,12 +206,14 @@ export class Start extends Phaser.Scene {
         this.puzzleInfluence = {}; // Track influence per second from each puzzle
         this.puzzleInfluence.windTotemSolari = 0;
         this.puzzleInfluence.windTotemUmbrae = 0;
+        this.puzzleInfluence.vineFlowSolari = 0;
+        this.puzzleInfluence.vineFlowUmbrae = 0;
         
         // 1. Drum Rhythm Pads (Ground Level) - +1 influence/sec
         this.createDrumPads();
         
-        // 2. Vine Pattern Wall (Middle Platform) - +2 influence/sec
-        this.createVinePatternWall();
+        // 2. Vine Flow Puzzle (Middle Platform) - +2 influence/sec
+        this.createVineFlowPuzzle();
         
         // 3. Wind Totem Dial (Top Platform) - +3 influence/sec
         this.createWindTotemDial();
@@ -234,6 +236,9 @@ export class Start extends Phaser.Scene {
         this.playerSpeed = 200;
         this.jumpVelocity = -500;
         this.climbSpeed = 200; // Constant velocity for climbing
+        // Initialize vine climb speed (can be modified by debuffs)
+        this.player1.vineClimbSpeed = this.climbSpeed;
+        this.player2.vineClimbSpeed = this.climbSpeed;
         
         // ===== LEVEL TIMER =====
         this.levelTime = 0;
@@ -264,29 +269,175 @@ export class Start extends Phaser.Scene {
         this.puzzleNodes.drumPads = this.drumPads;
     }
 
-    createVinePatternWall() {
-        // Create pattern wall on middle platform (compressed)
-        const patternPositions = [
-            {x: 540, y: 265}, {x: 600, y: 265}, {x: 660, y: 265}, {x: 720, y: 265},
-            {x: 540, y: 295}, {x: 600, y: 295}, {x: 660, y: 295}, {x: 720, y: 295}
-        ];
+    createVineFlowPuzzle() {
+        // Create vine indicator on middle platform - a wall of vines
+        const vineWallX = 640; // Center of middle platform
+        const vineWallY = 280; // Middle platform Y position
         
-        this.vinePattern = [];
-        this.vinePattern.correctOrder = [0, 1, 4, 5, 2, 3, 6, 7]; // Pattern to activate (vine indices)
-        this.vinePattern.currentStep = 0;
-        this.vinePattern.completed = false;
-        this.vinePattern.lastActivationTime = 0; // Prevent rapid re-activation
+        // Create a vine wall structure as the indicator
+        this.vineFlowIndicator = this.add.container(vineWallX, vineWallY);
         
-        patternPositions.forEach((pos, index) => {
-            const vine = this.add.circle(pos.x, pos.y, 20, 0x228B22);
+        // Main vine wall background
+        const wallBg = this.add.rectangle(0, 0, 120, 60, 0x228B22);
+        wallBg.setStrokeStyle(3, 0x1a5f1a);
+        
+        // Decorative vines on the wall
+        for (let i = 0; i < 3; i++) {
+            const vine = this.add.rectangle(-40 + i * 40, 0, 8, 40, 0x1a5f1a);
             vine.setOrigin(0.5, 0.5);
-            vine.patternIndex = index;
-            vine.activated = false;
-            vine.owner = null;
-            this.vinePattern.push(vine);
-        });
+            this.vineFlowIndicator.add(vine);
+        }
         
-        this.puzzleNodes.vinePattern = this.vinePattern;
+        // Add leaves/flowers as decoration
+        for (let i = 0; i < 4; i++) {
+            const leaf = this.add.circle(-50 + i * 33, -15 + (i % 2) * 30, 6, 0x32CD32);
+            this.vineFlowIndicator.add(leaf);
+        }
+        
+        this.vineFlowIndicator.add(wallBg);
+        this.vineFlowIndicator.setDepth(5);
+        
+        // Vine Flow state
+        this.vineFlowIndicator.active = false;
+        this.vineFlowIndicator.owner = null;
+        this.vineFlowIndicator.cooldownTimer = 0;
+        this.vineFlowIndicator.cooldownActive = false;
+        
+        // Cooldown timer text
+        this.vineFlowIndicator.cooldownText = this.add.text(
+            vineWallX,
+            vineWallY - 50,
+            '',
+            {
+                fontSize: '20px',
+                fill: '#ff0000',
+                fontStyle: 'bold'
+            }
+        ).setOrigin(0.5, 1);
+        this.vineFlowIndicator.cooldownText.setVisible(false);
+        
+        // Lights Out games for each player on TV screens
+        this.lightsOutP1 = this.createLightsOutGame(320, 600, 'Solari');
+        this.lightsOutP2 = this.createLightsOutGame(960, 600, 'Umbrae');
+        
+        this.puzzleNodes.vineFlow = this.vineFlowIndicator;
+    }
+    
+    createLightsOutGame(centerX, centerY, playerFaction) {
+        const game = {
+            active: false,
+            playerFaction: playerFaction,
+            container: null,
+            vines: [], // Array of 5 vine tiles
+            vineState: [], // Array of 5 booleans (true = on/player's color, false = off/green or opponent's color)
+            vineToggled: [], // Track which vines player has toggled (to show player color vs opponent color)
+            targetState: null, // All true = all vines in player's color
+            completed: false,
+            phase: 'intro',
+            introTimer: 0,
+            timer: 15, // 15 second time limit
+            timerText: null,
+            baseColor: playerFaction === 'Solari' ? 0x1a1a2e : 0x2d1b4e,
+            onColor: playerFaction === 'Solari' ? 0xFFD700 : 0x8B00FF, // Gold for Solari, Purple for Umbrae
+            offColor: 0x228B22, // Dark green for off/unowned
+            opponentColor: playerFaction === 'Solari' ? 0x8B00FF : 0xFFD700 // Purple for Solari's opponent, Gold for Umbrae's opponent
+        };
+        
+        // Create container for the TV screen
+        const container = this.add.container(centerX, centerY);
+        container.setVisible(false);
+        container.setDepth(20);
+        container.setAlpha(0);
+        game.container = container;
+        
+        const gameSize = 220; // Slightly larger to fit 7 vines
+        const numVines = 7;
+        const vineSpacing = gameSize / (numVines + 1);
+        const vineSize = 25; // Slightly smaller to fit 7
+        
+        // Background (much taller to fit all text without cutoff)
+        const bgHeight = gameSize + 300; // Extra tall to ensure no cutoff
+        const bg = this.add.rectangle(0, 0, gameSize + 20, bgHeight, game.baseColor);
+        bg.setStrokeStyle(3, 0xffffff);
+        container.add(bg);
+        game.bg = bg;
+        
+        // Create 7 vines in a row (moved up to make room for text below)
+        const vines = [];
+        const vineState = [];
+        for (let i = 0; i < numVines; i++) {
+            const x = -gameSize/2 + (i + 1) * vineSpacing;
+            const y = -30; // Move vines up to make room for text
+            
+            // Create vine tile (leaf)
+            const vine = this.add.rectangle(x, y, vineSize, vineSize, game.offColor);
+            vine.setStrokeStyle(2, 0xffffff); // White border always visible
+            vine.setOrigin(0.5, 0.5);
+            vine.index = i;
+            vine.isOn = false;
+            vine.glow = this.add.circle(x, y, vineSize/2, game.onColor, 0);
+            vine.glow.setOrigin(0.5, 0.5);
+            vine.glow.setAlpha(0);
+            container.add(vine.glow);
+            container.add(vine);
+            vines.push(vine);
+            vineState.push(false);
+        }
+        game.vines = vines;
+        game.vineState = vineState;
+        game.numVines = numVines;
+        
+        // Key hint (showing which keys to use) - above vines
+        const keyHint = playerFaction === 'Solari' 
+            ? this.add.text(0, -gameSize/2 - 50, 'Keys: 1 2 3 4 5 6 7', {
+                fontSize: '12px',
+                fill: '#ffffff',
+                align: 'center',
+                fontStyle: 'bold'
+            })
+            : this.add.text(0, -gameSize/2 - 50, 'Keys: 4 5 6 7 8 9 0', {
+                fontSize: '12px',
+                fill: '#ffffff',
+                align: 'center',
+                fontStyle: 'bold'
+            });
+        keyHint.setOrigin(0.5, 0.5);
+        container.add(keyHint);
+        game.keyHint = keyHint;
+
+        // Timer text (below vines, before instructions)
+        const timerText = this.add.text(0, 20, '15', {
+            fontSize: '18px',
+            fill: '#ffff00',
+            fontStyle: 'bold'
+        }).setOrigin(0.5, 0.5);
+        container.add(timerText);
+        game.timerText = timerText;
+        
+        // Instruction text (positioned well below vines to ensure visibility)
+        const goalText = playerFaction === 'Solari' 
+            ? 'Light ALL vines ON (Sun rewards you!)' 
+            : 'Light ALL vines ON (Darkness rewards you!)';
+        const keyText = playerFaction === 'Solari' ? '1-7' : '4-0';
+        const instructionText = this.add.text(0, 60, `HOW TO PLAY:\nPress keys ${keyText} to toggle vines.\nEach press affects that vine and its neighbors.\n${goalText}`, {
+            fontSize: '8px',
+            fill: '#ffffff',
+            align: 'center',
+            wordWrap: { width: gameSize - 10 }
+        }).setOrigin(0.5, 0.5);
+        container.add(instructionText);
+        game.instructionText = instructionText;
+        
+        // Status text (positioned at the very bottom, well within background)
+        const statusText = this.add.text(0, bgHeight/2 - 20, '', {
+            fontSize: '11px',
+            fill: '#ffff00',
+            fontStyle: 'bold'
+        }).setOrigin(0.5, 0.5);
+        container.add(statusText);
+        game.statusText = statusText;
+        
+        return game;
     }
 
     createWindTotemDial() {
@@ -525,7 +676,7 @@ export class Start extends Phaser.Scene {
         
         // Update puzzle nodes
         this.updateDrumPads();
-        this.updateVinePattern();
+        this.updateVineFlowPuzzle();
         this.updateWindTotem();
         
         // Update balance meter
@@ -600,7 +751,7 @@ export class Start extends Phaser.Scene {
             else if (wHeld || wPressed) {
                 this.player1.body.setGravityY(0);
                 this.player1.body.setAllowGravity(false);
-                this.player1.body.setVelocityY(-this.climbSpeed);
+                this.player1.body.setVelocityY(-(this.player1.vineClimbSpeed || this.climbSpeed));
                 // Stop at top
                 if (this.player1.y <= vineTop + playerHalfHeight) {
                     this.player1.y = vineTop + playerHalfHeight;
@@ -709,7 +860,7 @@ export class Start extends Phaser.Scene {
             else if (upHeld || upPressed) {
                 this.player2.body.setGravityY(0);
                 this.player2.body.setAllowGravity(false);
-                this.player2.body.setVelocityY(-this.climbSpeed);
+                this.player2.body.setVelocityY(-(this.player2.vineClimbSpeed || this.climbSpeed));
                 // Stop at top
                 if (this.player2.y <= vineTop + playerHalfHeight) {
                     this.player2.y = vineTop + playerHalfHeight;
@@ -902,79 +1053,97 @@ export class Start extends Phaser.Scene {
         }
     }
 
-    updateVinePattern() {
-        const pattern = this.vinePattern;
+    updateVineFlowPuzzle() {
+        const indicator = this.vineFlowIndicator;
         
-        // Prevent rapid re-activation (cooldown)
-        const currentTime = this.time.now;
-        const cooldown = 200; // 200ms cooldown between activations
+        // Check if players are near vine indicator (within 80 pixels)
+        const p1Near = Phaser.Math.Distance.Between(this.player1.x, this.player1.y, indicator.x, indicator.y) < 80;
+        const p2Near = Phaser.Math.Distance.Between(this.player2.x, this.player2.y, indicator.x, indicator.y) < 80;
         
-        // Check if player is stepping on vines
-        pattern.forEach(vine => {
-            const p1Near = Phaser.Math.Distance.Between(this.player1.x, this.player1.y, vine.x, vine.y) < 35;
-            const p2Near = Phaser.Math.Distance.Between(this.player2.x, this.player2.y, vine.x, vine.y) < 35;
-            
-            if ((p1Near || p2Near) && currentTime - pattern.lastActivationTime > cooldown) {
-                const player = p1Near ? this.player1 : this.player2;
-                const expectedIndex = pattern.correctOrder[pattern.currentStep];
-                
-                // Check if this is the correct vine in sequence and not already activated
-                if (vine.patternIndex === expectedIndex && !vine.activated) {
-                    vine.activated = true;
-                    vine.owner = player.faction;
-                    vine.setFillStyle(player.faction === 'Solari' ? 0xFFD700 : 0x8B00FF);
-                    pattern.currentStep++;
-                    pattern.lastActivationTime = currentTime;
-                    
-                    // Visual feedback - create sparkle effect
-                    const sparkle = this.add.circle(vine.x, vine.y, 5, player.faction === 'Solari' ? 0xFFD700 : 0x8B00FF);
-                    sparkle.setAlpha(0.8);
-                    this.tweens.add({
-                        targets: sparkle,
-                        scaleX: 2,
-                        scaleY: 2,
-                        alpha: 0,
-                        duration: 300,
-                        onComplete: () => sparkle.destroy()
-                    });
-                    
-                    if (pattern.currentStep >= pattern.correctOrder.length) {
-                        // Pattern completed!
-                        pattern.completed = true;
-                        pattern.owner = player.faction;
-                        this.puzzleInfluence.vinePattern = player.faction === 'Solari' ? 2 : -2;
-                        // Reset after a delay
-                        if (this.vinePatternResetTimer) {
-                            this.vinePatternResetTimer.destroy();
-                        }
-                        this.vinePatternResetTimer = this.time.delayedCall(5000, () => {
-                            pattern.forEach(v => {
-                                v.activated = false;
-                                v.setFillStyle(0x228B22);
-                            });
-                            pattern.currentStep = 0;
-                            pattern.completed = false;
-                            this.puzzleInfluence.vinePattern = 0;
-                        });
-                    }
-                } else if (vine.patternIndex !== expectedIndex && !vine.activated && pattern.currentStep > 0) {
-                    // Wrong vine in sequence - reset only if we've started the pattern
-                    // But don't reset if player is just standing on a vine
-                    // Only reset if they step on a wrong vine while pattern is in progress
-                    const timeSinceLastActivation = currentTime - pattern.lastActivationTime;
-                    if (timeSinceLastActivation < 1000) { // Only reset if recent activation
-                        pattern.forEach(v => {
-                            v.activated = false;
-                            v.setFillStyle(0x228B22);
-                        });
-                        pattern.currentStep = 0;
-                        pattern.completed = false;
-                        this.puzzleInfluence.vinePattern = 0;
-                        pattern.lastActivationTime = currentTime;
-                    }
+        // Show interaction indicator
+        // Only allow interaction if no one owns it OR if opponent owns it (can challenge)
+        const updateVineIndicator = (player, near) => {
+            const canInteract = !indicator.cooldownActive && 
+                               (indicator.owner === null || indicator.owner !== player.faction);
+            if (near && !player.teleporting && !this.lightsOutP1.active && !this.lightsOutP2.active && canInteract) {
+                if (!player.vineFlowIndicator) {
+                    const indicatorGroup = this.add.container(player.x, player.y - 50);
+                    const circle = this.add.circle(0, 0, 25, 0xffffff, 0.9);
+                    circle.setStrokeStyle(3, 0x000000);
+                    const keyText = player.faction === 'Solari'
+                        ? this.add.text(0, 0, 'W', { fontSize: '24px', fill: '#000000', fontStyle: 'bold' })
+                        : this.add.text(0, -2, '↑', { fontSize: '24px', fill: '#000000', fontStyle: 'bold' });
+                    keyText.setOrigin(0.5, 0.5);
+                    indicatorGroup.add([circle, keyText]);
+                    player.vineFlowIndicator = indicatorGroup;
+                } else {
+                    player.vineFlowIndicator.setPosition(player.x, player.y - 50);
+                    player.vineFlowIndicator.setVisible(true);
+                }
+            } else {
+                if (player.vineFlowIndicator) {
+                    player.vineFlowIndicator.setVisible(false);
                 }
             }
-        });
+        };
+        
+        updateVineIndicator(this.player1, p1Near);
+        updateVineIndicator(this.player2, p2Near);
+        
+        // Handle interaction
+        // Only allow if no one owns it OR if opponent owns it (can challenge)
+        const p1CanInteract = !indicator.cooldownActive && 
+                              (indicator.owner === null || indicator.owner !== this.player1.faction);
+        const p2CanInteract = !indicator.cooldownActive && 
+                              (indicator.owner === null || indicator.owner !== this.player2.faction);
+        
+        if (p1Near && Phaser.Input.Keyboard.JustDown(this.wKey) && !this.lightsOutP1.active && !this.lightsOutP2.active && p1CanInteract && !this.player1.teleporting) {
+            this.teleportToVineTV(this.player1, this.lightsOutP1);
+        }
+        
+        if (p2Near && Phaser.Input.Keyboard.JustDown(this.upKey) && !this.lightsOutP1.active && !this.lightsOutP2.active && p2CanInteract && !this.player2.teleporting) {
+            this.teleportToVineTV(this.player2, this.lightsOutP2);
+        }
+        
+        // Update Lights Out games
+        if (this.lightsOutP1.active) {
+            this.updateLightsOut(this.lightsOutP1, this.player1);
+        }
+        if (this.lightsOutP2.active) {
+            this.updateLightsOut(this.lightsOutP2, this.player2);
+        }
+        
+        // Update cooldown
+        if (indicator.cooldownActive) {
+            indicator.cooldownTimer -= 1/60;
+            if (indicator.cooldownText) {
+                const remaining = Math.max(0, Math.ceil(indicator.cooldownTimer));
+                indicator.cooldownText.setText(`Cooldown: ${remaining}`);
+                indicator.cooldownText.setVisible(true);
+                indicator.cooldownText.setPosition(indicator.x, indicator.y - 50);
+            }
+            if (indicator.cooldownTimer <= 0) {
+                indicator.cooldownActive = false;
+                indicator.cooldownTimer = 0;
+                if (indicator.cooldownText) {
+                    indicator.cooldownText.setVisible(false);
+                }
+            }
+        } else if (indicator.cooldownText) {
+            indicator.cooldownText.setVisible(false);
+        }
+        
+        // Update influence
+        if (indicator.owner === 'Solari') {
+            this.puzzleInfluence.vineFlowSolari = 2;
+            this.puzzleInfluence.vineFlowUmbrae = 0;
+        } else if (indicator.owner === 'Umbrae') {
+            this.puzzleInfluence.vineFlowSolari = 0;
+            this.puzzleInfluence.vineFlowUmbrae = 2;
+        } else {
+            this.puzzleInfluence.vineFlowSolari = 0;
+            this.puzzleInfluence.vineFlowUmbrae = 0;
+        }
     }
 
     updateWindTotem() {
@@ -1612,11 +1781,454 @@ export class Start extends Phaser.Scene {
             this.windTotem.cooldownTimer = 20; // 20 second cooldown on failure
         }
     }
+    
+    teleportToVineTV(player, game) {
+        player.teleporting = true;
+        player.originalX = player.x;
+        player.originalY = player.y;
+        player.setVisible(false);
+        player.body.enable = false;
+        this.startLightsOut(game, player);
+    }
+    
+    startLightsOut(game, player) {
+        // Make sure the other player's game is completely hidden first
+        if (player.faction === 'Solari') {
+            if (this.lightsOutP2 && this.lightsOutP2.container) {
+                this.lightsOutP2.container.setVisible(false);
+                this.lightsOutP2.container.setAlpha(0);
+                this.lightsOutP2.active = false;
+            }
+        } else {
+            if (this.lightsOutP1 && this.lightsOutP1.container) {
+                this.lightsOutP1.container.setVisible(false);
+                this.lightsOutP1.container.setAlpha(0);
+                this.lightsOutP1.active = false;
+            }
+        }
+        
+        game.active = true;
+        game.player = player;
+        game.completed = false;
+        game.phase = 'intro';
+        game.introTimer = 0;
+        game.timer = 15; // Reset timer to 15 seconds
+        
+        // Set target state - both want all vines in their color (ON)
+        game.targetState = true;
+        
+        // Check if vines are owned by opponent
+        const currentOwner = this.vineFlowIndicator.owner;
+        game.currentOwner = currentOwner; // Store for visual purposes
+        
+        // Generate starting pattern based on ownership
+        this.generateLightsOutPuzzle(game, currentOwner, player.faction);
+        
+        // Update visual state
+        this.updateLightsOutVisuals(game);
+        
+        // Show container with fade-in
+        game.container.setVisible(true);
+        this.tweens.add({
+            targets: game.container,
+            alpha: 1,
+            duration: 250
+        });
+    }
+    
+    generateLightsOutPuzzle(game, currentOwner, playerFaction) {
+        // Generate starting pattern based on ownership
+        const numVines = 7;
+        const vineState = [];
+        const vineToggled = [];
+        
+        if (currentOwner === null) {
+            // First player: Start with all green (OFF)
+            for (let i = 0; i < numVines; i++) {
+                vineState.push(false); // All OFF (green)
+                vineToggled.push(false); // None toggled yet
+            }
+        } else if (currentOwner !== playerFaction) {
+            // Opponent owns it: Start with ALL vines ON in opponent's color
+            // All must be ON (true) and NOT toggled (so they show opponent color)
+            for (let i = 0; i < numVines; i++) {
+                vineState.push(true); // All ON
+                vineToggled.push(false); // Not toggled yet = opponent's color
+            }
+        } else {
+            // Player already owns it: Shouldn't happen (can't challenge yourself)
+            // But if it does, start with all player's color
+            for (let i = 0; i < numVines; i++) {
+                vineState.push(true); // All ON
+                vineToggled.push(true); // Already toggled = player's color
+            }
+        }
+        
+        game.vineState = vineState;
+        game.vineToggled = vineToggled;
+        game.currentOwner = currentOwner; // Store for visual purposes
+    }
+    
+    updateLightsOutVisuals(game) {
+        const numVines = 7;
+        const opponentOwns = game.currentOwner && game.currentOwner !== game.playerFaction;
+        
+        for (let i = 0; i < numVines; i++) {
+            const vine = game.vines[i];
+            const isOn = game.vineState[i];
+            vine.isOn = isOn;
+            
+            if (isOn) {
+                // If opponent owns it and player hasn't toggled this vine yet, show opponent's color
+                // Once player toggles it, show player's color
+                const color = (opponentOwns && !game.vineToggled[i]) 
+                    ? game.opponentColor 
+                    : game.onColor;
+                vine.setFillStyle(color);
+                vine.setStrokeStyle(2, 0xffffff); // White border always visible
+                vine.glow.setAlpha(0.8);
+            } else {
+                // OFF = green (unowned or toggled off)
+                vine.setFillStyle(game.offColor);
+                vine.setStrokeStyle(2, 0xffffff); // White border always visible
+                vine.glow.setAlpha(0);
+            }
+        }
+    }
+    
+    toggleLightsOutVine(game, index) {
+        const numVines = 7;
+        
+        // Toggle the pressed vine and its neighbors
+        // Vine 0: toggles 0, 1
+        // Vine 1: toggles 0, 1, 2
+        // Vine 2: toggles 1, 2, 3
+        // Vine 3: toggles 2, 3, 4
+        // Vine 4: toggles 3, 4, 5
+        // Vine 5: toggles 4, 5, 6
+        // Vine 6: toggles 5, 6
+        
+        const toggles = [];
+        if (index === 0) {
+            toggles.push(0, 1);
+        } else if (index === numVines - 1) {
+            toggles.push(index - 1, index);
+        } else {
+            toggles.push(index - 1, index, index + 1);
+        }
+        
+        const opponentOwns = game.currentOwner && game.currentOwner !== game.playerFaction;
+        
+        toggles.forEach(i => {
+            if (i >= 0 && i < numVines) {
+                const wasOn = game.vineState[i];
+                const wasToggled = game.vineToggled[i];
+                
+                // Toggle the vine state
+                game.vineState[i] = !game.vineState[i];
+                
+                // Update toggled state based on new state
+                if (game.vineState[i]) {
+                    // Vine is now ON
+                    if (opponentOwns) {
+                        // If opponent owns it and vine was OFF, toggling it ON means player color
+                        // If vine was ON in opponent color and toggled OFF then ON, it's player color
+                        // Once a vine is toggled by player, it should always be player color when ON
+                        if (wasToggled || !wasOn) {
+                            // Was previously toggled OR was OFF - becomes player color
+                            game.vineToggled[i] = true;
+                        } else {
+                            // Was ON in opponent color and toggled to ON again without going OFF
+                            // This shouldn't happen, but if it does, check if player has toggled others
+                            const hasToggledOthers = game.vineToggled.some((t, idx) => idx !== i && t === true);
+                            if (hasToggledOthers) {
+                                // Player has toggled other vines - this one should be player color too
+                                game.vineToggled[i] = true;
+                            } else {
+                                // Still in opponent color (starting state)
+                                game.vineToggled[i] = false;
+                            }
+                        }
+                    } else {
+                        // No opponent - first player, always player color when ON
+                        game.vineToggled[i] = true;
+                    }
+                } else {
+                    // Vine is now OFF - keep toggled state (remembers if it was player color)
+                    // Don't reset toggled flag
+                }
+                
+                // Visual feedback - brief highlight
+                const vine = game.vines[i];
+                this.tweens.add({
+                    targets: vine,
+                    scaleX: 1.2,
+                    scaleY: 1.2,
+                    duration: 100,
+                    yoyo: true,
+                    ease: 'Power2'
+                });
+            }
+        });
+        
+        // Update visuals after toggling
+        this.updateLightsOutVisuals(game);
+        
+        // Check for punishment: if opponent owns and player has converted vines to their color,
+        // but then all vines are back to opponent color (all ON but not toggled)
+        if (opponentOwns && game.phase === 'playing') {
+            const hasToggledAny = game.vineToggled.some(t => t === true);
+            if (hasToggledAny) {
+                // Player has toggled at least one vine to their color
+                // Check if ALL vines are now back to opponent color (ON but not toggled)
+                let allBackToOpponent = true;
+                for (let j = 0; j < numVines; j++) {
+                    if (!game.vineState[j] || game.vineToggled[j]) {
+                        // Vine is OFF or in player color
+                        allBackToOpponent = false;
+                        break;
+                    }
+                }
+                if (allBackToOpponent) {
+                    // All vines are back to opponent color - punishment
+                    game.phase = 'done';
+                    game.completed = false;
+                    game.statusText.setText('FAILED! All vines back to opponent color!');
+                    game.statusText.setFill('#ff0000');
+                    this.time.delayedCall(2000, () => this.endLightsOut(game, false));
+                    return;
+                }
+            }
+        }
+    }
+    
+    checkLightsOutComplete(game) {
+        const numVines = 7;
+        
+        // Check if all vines are ON and in player's color
+        // All must be ON (true) AND toggled by player (showing player color, not opponent color)
+        for (let i = 0; i < numVines; i++) {
+            // Vine must be ON
+            if (game.vineState[i] !== true) {
+                return false;
+            }
+            // If opponent owns it, vine must have been toggled by player to show player color
+            const opponentOwns = game.currentOwner && game.currentOwner !== game.playerFaction;
+            if (opponentOwns && !game.vineToggled[i]) {
+                return false; // Vine is still in opponent's color
+            }
+        }
+        return true; // All vines are ON and in player's color
+    }
+    
+    hideLightsOut(game) {
+        if (!game) return;
+        
+        game.active = false;
+        if (game.container) {
+            if (game.container.visible) {
+                this.tweens.add({
+                    targets: game.container,
+                    alpha: 0,
+                    duration: 250,
+                    onComplete: () => {
+                        if (game.container) {
+                            game.container.setVisible(false);
+                        }
+                    }
+                });
+            } else {
+                // Already hidden, just make sure alpha is 0
+                game.container.setAlpha(0);
+            }
+        }
+        if (game.instructionText) {
+            game.instructionText.setText('');
+        }
+        if (game.statusText) {
+            game.statusText.setText('');
+        }
+    }
+    
+    updateLightsOut(game, player) {
+        if (!game.active) return;
+        
+        const dt = 1/60;
+        
+        // Intro phase
+        if (game.phase === 'intro') {
+            game.introTimer += dt;
+            const goalText = game.playerFaction === 'Solari' 
+                ? 'Light ALL vines ON (Sun rewards you!)' 
+                : 'Light ALL vines ON (Darkness rewards you!)';
+            const keyHint = game.playerFaction === 'Solari' ? '1-7' : '4-0';
+            game.instructionText.setText(
+                `HOW TO PLAY:\nPress keys ${keyHint} to toggle vines.\nEach press affects that vine and its neighbors.\n${goalText}`
+            );
+            if (game.introTimer >= 3) {
+                game.phase = 'playing';
+                const goalText = game.playerFaction === 'Solari' ? 'Turn ALL lights ON' : 'Turn ALL lights OFF';
+                game.instructionText.setText(`Goal: ${goalText}`);
+            }
+            return;
+        }
+        
+        if (game.phase === 'playing') {
+            // Update timer
+            game.timer -= dt;
+            if (game.timerText) {
+                const remaining = Math.max(0, Math.ceil(game.timer));
+                game.timerText.setText(`${remaining}`);
+                // Change color as time runs out
+                if (remaining <= 5) {
+                    game.timerText.setFill('#ff0000'); // Red when low
+                } else if (remaining <= 10) {
+                    game.timerText.setFill('#ffaa00'); // Orange
+                } else {
+                    game.timerText.setFill('#ffff00'); // Yellow
+                }
+            }
+            
+            // Check for timeout
+            if (game.timer <= 0) {
+                game.phase = 'done';
+                game.completed = false;
+                game.statusText.setText('TIME UP! You failed!');
+                game.statusText.setFill('#ff0000');
+                this.time.delayedCall(2000, () => this.endLightsOut(game, false));
+                return;
+            }
+            
+            // Initialize number keys if not already done
+            if (!game.numKeys) {
+                if (game.playerFaction === 'Solari') {
+                    // Player 1: Keys 1-7
+                    game.numKeys = {
+                        '1': this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ONE),
+                        '2': this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.TWO),
+                        '3': this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.THREE),
+                        '4': this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.FOUR),
+                        '5': this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.FIVE),
+                        '6': this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SIX),
+                        '7': this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SEVEN)
+                    };
+                    game.keyMap = { '1': 0, '2': 1, '3': 2, '4': 3, '5': 4, '6': 5, '7': 6 };
+                } else {
+                    // Player 2: Keys 4-0 (4, 5, 6, 7, 8, 9, 0)
+                    game.numKeys = {
+                        '4': this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.FOUR),
+                        '5': this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.FIVE),
+                        '6': this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SIX),
+                        '7': this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SEVEN),
+                        '8': this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.EIGHT),
+                        '9': this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.NINE),
+                        '0': this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ZERO)
+                    };
+                    game.keyMap = { '4': 0, '5': 1, '6': 2, '7': 3, '8': 4, '9': 5, '0': 6 };
+                }
+            }
+            
+            // Check for number key presses
+            for (const [key, vineIndex] of Object.entries(game.keyMap)) {
+                if (Phaser.Input.Keyboard.JustDown(game.numKeys[key])) {
+                    // Check if game is still active (might have been ended by punishment)
+                    if (!game.active || game.phase !== 'playing') {
+                        break;
+                    }
+                    
+                    this.toggleLightsOutVine(game, vineIndex);
+                    
+                    // Check if punishment was triggered (game ended)
+                    if (!game.active || game.phase !== 'playing') {
+                        break;
+                    }
+                    
+                    // Check for win condition (all vines in player's color)
+                    if (this.checkLightsOutComplete(game)) {
+                        game.phase = 'done';
+                        game.completed = true;
+                        const rewardText = game.playerFaction === 'Solari' 
+                            ? 'PERFECT! Sun rewards you!' 
+                            : 'PERFECT! Darkness rewards you!';
+                        game.statusText.setText(rewardText);
+                        game.statusText.setFill('#00ff00');
+                        this.time.delayedCall(2000, () => this.endLightsOut(game, true));
+                    }
+                    break;
+                }
+            }
+        }
+    }
+    
+    endLightsOut(game, success) {
+        const player = game.player;
+        
+        if (player) {
+            player.teleporting = false;
+            player.setVisible(true);
+            if (player.body) {
+                player.body.enable = true;
+                player.body.setAllowGravity(true);
+                player.body.setVelocity(0, 0);
+            }
+        }
+        
+        this.hideLightsOut(game);
+        
+        if (success) {
+            // Win: Claim ownership and get +2 influence/sec
+            // Only one player can control at a time - set owner
+            this.vineFlowIndicator.owner = game.playerFaction;
+            if (game.playerFaction === 'Solari') {
+                this.puzzleInfluence.vineFlowSolari = 2;
+                this.puzzleInfluence.vineFlowUmbrae = 0;
+            } else {
+                this.puzzleInfluence.vineFlowSolari = 0;
+                this.puzzleInfluence.vineFlowUmbrae = 2;
+            }
+            // No cooldown when someone owns it - they can be challenged immediately
+        } else {
+            // Failure: -2 influence/sec and slower vine movement for 20 seconds
+            if (game.playerFaction === 'Solari') {
+                this.puzzleInfluence.vineFlowSolari = -2;
+                // Apply slower vine movement
+                if (player) {
+                    player.vineClimbSpeed = this.climbSpeed * 0.5; // Half speed on vines
+                    this.time.delayedCall(20000, () => {
+                        if (player) {
+                            player.vineClimbSpeed = this.climbSpeed;
+                        }
+                    });
+                }
+            } else {
+                this.puzzleInfluence.vineFlowUmbrae = -2;
+                // Apply slower vine movement
+                if (player) {
+                    player.vineClimbSpeed = this.climbSpeed * 0.5; // Half speed on vines
+                    this.time.delayedCall(20000, () => {
+                        if (player) {
+                            player.vineClimbSpeed = this.climbSpeed;
+                        }
+                    });
+                }
+            }
+            
+            // Only apply cooldown if no one owns the vines (when owner is null)
+            if (this.vineFlowIndicator.owner === null) {
+                this.vineFlowIndicator.cooldownActive = true;
+                this.vineFlowIndicator.cooldownTimer = 20;
+            }
+        }
+    }
 
     updateBalanceMeter() {
         // Calculate influence per second from all puzzles
         let solariInfluencePerSec = 0;
         let umbraeInfluencePerSec = 0;
+        
+        // Vine Flow Puzzle influence
+        solariInfluencePerSec += this.puzzleInfluence.vineFlowSolari || 0;
+        umbraeInfluencePerSec += this.puzzleInfluence.vineFlowUmbrae || 0;
         
         // Wind Totem influence
         if (this.puzzleInfluence.windTotemSolari) {
