@@ -201,6 +201,7 @@ export class Start extends Phaser.Scene {
         this.physics.add.existing(this.player1);
         this.player1.body.setCollideWorldBounds(true);
         this.player1.body.setSize(50, 50);
+        this.player1.setDepth(20); // Always on top so players can't hide behind each other
         this.player1.faction = 'Solari';
         this.player1.climbing = false;
         this.player1.onVine = null;
@@ -217,6 +218,7 @@ export class Start extends Phaser.Scene {
         this.physics.add.existing(this.player2);
         this.player2.body.setCollideWorldBounds(true);
         this.player2.body.setSize(50, 50);
+        this.player2.setDepth(20); // Always on top so players can't hide behind each other
         this.player2.faction = 'Umbrae';
         this.player2.climbing = false;
         this.player2.onVine = null;
@@ -387,7 +389,9 @@ export class Start extends Phaser.Scene {
     createVineFlowPuzzle() {
         // Create vine indicator on middle platform - a wall of vines
         const vineWallX = 640; // Center of middle platform
-        const vineWallY = 250; // Middle platform Y position (moved down a bit but still above middle pillar)
+        // Middle platform is at y: 250, height 30, so top is at y: 235
+        // Position indicator completely above the platform (indicator height is 60, so center it above)
+        const vineWallY = 205; // Completely above platform (235 - 30 = 205, so bottom of indicator is at 235)
         
         // Create a vine wall structure as the indicator
         this.vineFlowIndicator = this.add.container(vineWallX, vineWallY);
@@ -421,7 +425,7 @@ export class Start extends Phaser.Scene {
         // Cooldown timer text
         this.vineFlowIndicator.cooldownText = this.add.text(
             vineWallX,
-            vineWallY - 50,
+            vineWallY - 40,
             '',
             {
                 fontSize: '20px',
@@ -1322,9 +1326,33 @@ export class Start extends Phaser.Scene {
     updateVineFlowPuzzle() {
         const indicator = this.vineFlowIndicator;
         
-        // Check if players are near vine indicator (within 80 pixels)
-        const p1Near = Phaser.Math.Distance.Between(this.player1.x, this.player1.y, indicator.x, indicator.y) < 80;
-        const p2Near = Phaser.Math.Distance.Between(this.player2.x, this.player2.y, indicator.x, indicator.y) < 80;
+        // Middle platform bounds: x: 640, y: 250, width: 400, height: 30
+        // Platform horizontal range: 440 to 840 (640 ± 200)
+        // Platform top: y: 235 (250 - 15)
+        // Player must be on the platform to trigger (within platform bounds and on top)
+        const platformLeft = 440;
+        const platformRight = 840;
+        const platformTop = 235;
+        const platformBottom = 265; // 250 + 15
+        
+        // Check if player 1 is on the middle platform
+        const p1OnPlatform = this.player1.x >= platformLeft && 
+                           this.player1.x <= platformRight &&
+                           this.player1.y >= platformTop && 
+                           this.player1.y <= platformBottom;
+        
+        // Check if player 2 is on the middle platform
+        const p2OnPlatform = this.player2.x >= platformLeft && 
+                           this.player2.x <= platformRight &&
+                           this.player2.y >= platformTop && 
+                           this.player2.y <= platformBottom;
+        
+        // Only trigger if player is on the platform and near the indicator
+        const horizontalDist1 = Math.abs(this.player1.x - indicator.x);
+        const p1Near = p1OnPlatform && horizontalDist1 < 80;
+        
+        const horizontalDist2 = Math.abs(this.player2.x - indicator.x);
+        const p2Near = p2OnPlatform && horizontalDist2 < 80;
         
         // Show interaction indicator
         // Only allow interaction if no one owns it OR if opponent owns it (can challenge)
