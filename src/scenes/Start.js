@@ -291,7 +291,7 @@ export class Start extends Phaser.Scene {
         this.runesPillars = [];
         const pillarPositions = [
             { x: 130, y: 217 },   // Left pillar on left vine platform (platform top at y: 267.5, pillar bottom at y: 267 sits on it)
-            { x: 640, y: 350 },   // Middle pillar (center of screen, on ground)
+            { x: 640, y: 350 },   // Middle pillar (center of screen, on ground) - Ground top is y=400, pillar height 100, so pillar center at 350 means pillar bottom = 350+50=400 (sits on ground)
             { x: 1150, y: 217 }   // Right pillar on right vine platform (platform top at y: 267.5, pillar bottom at y: 267 sits on it)
         ];
         
@@ -314,6 +314,7 @@ export class Start extends Phaser.Scene {
         });
         
         // Create 3 rune spawn locations (left, middle, right)
+        // IMPORTANT: Array order must match pillar order: [left (0), middle (1), right (2)]
         this.runes = [];
         
         // Left rune - on left vine top platform (requires W+D to reach)
@@ -324,17 +325,7 @@ export class Start extends Phaser.Scene {
         leftRune.collected = false;
         leftRune.glow = this.add.circle(130, 75, 25, 0xFFD700, 0.3);
         leftRune.glow.setOrigin(0.5, 0.5);
-        this.runes.push(leftRune);
-        
-        // Right rune - on right vine top platform (requires Up+Right to reach)
-        const rightRune = this.add.circle(1150, 75, 20, 0x8B4513); // Brown/tan rune
-        rightRune.setStrokeStyle(2, 0xFFD700); // Gold border
-        rightRune.setOrigin(0.5, 0.5);
-        rightRune.runeIndex = 2;
-        rightRune.collected = false;
-        rightRune.glow = this.add.circle(1150, 75, 25, 0xFFD700, 0.3);
-        rightRune.glow.setOrigin(0.5, 0.5);
-        this.runes.push(rightRune);
+        this.runes.push(leftRune); // runes[0] = left pillar (index 0)
         
         // Middle rune - spawns randomly after 25 seconds
         const middleRune = this.add.circle(640, 75, 20, 0x8B4513); // Brown/tan rune
@@ -346,7 +337,17 @@ export class Start extends Phaser.Scene {
         middleRune.glow.setOrigin(0.5, 0.5);
         middleRune.setVisible(false); // Start hidden
         middleRune.glow.setVisible(false);
-        this.runes.push(middleRune);
+        this.runes.push(middleRune); // runes[1] = middle pillar (index 1)
+        
+        // Right rune - on right vine top platform (requires Up+Right to reach)
+        const rightRune = this.add.circle(1150, 75, 20, 0x8B4513); // Brown/tan rune
+        rightRune.setStrokeStyle(2, 0xFFD700); // Gold border
+        rightRune.setOrigin(0.5, 0.5);
+        rightRune.runeIndex = 2;
+        rightRune.collected = false;
+        rightRune.glow = this.add.circle(1150, 75, 25, 0xFFD700, 0.3);
+        rightRune.glow.setOrigin(0.5, 0.5);
+        this.runes.push(rightRune); // runes[2] = right pillar (index 2)
         
         // Middle rune spawn system
         this.middleRuneSpawnTimer = 25; // 25 seconds until spawn
@@ -364,20 +365,43 @@ export class Start extends Phaser.Scene {
         // List of reachable platform positions for random middle rune spawn
         // Positions are on TOP of platforms (platform top surface - rune radius to sit on platform)
         // Platform top = center Y - (height/2), Rune sits at top - 15 (so it's visible on platform)
-        this.reachablePlatformPositions = [
-            { x: 300, y: 332 },   // leftPlatform1 (top: 360-12.5=347.5, rune: 347.5-15=332.5)
-            { x: 980, y: 332 },   // rightPlatform1 (top: 360-12.5=347.5, rune: 347.5-15=332.5)
-            { x: 400, y: 242 },   // leftPlatform2 (top: 270-12.5=257.5, rune: 257.5-15=242.5) - moved down
-            { x: 880, y: 242 },   // rightPlatform2 (top: 270-12.5=257.5, rune: 257.5-15=242.5) - moved down
-            { x: 450, y: 102 },   // leftPlatform3 (top: 130-12.5=117.5, rune: 117.5-15=102.5) - moved down
-            { x: 830, y: 102 },   // rightPlatform3 (top: 130-12.5=117.5, rune: 117.5-15=102.5) - moved down
-            { x: 500, y: 42 },    // leftPlatform4 (top: 70-12.5=57.5, rune: 57.5-15=42.5) - moved down
-            { x: 780, y: 42 },    // rightPlatform4 (top: 70-12.5=57.5, rune: 57.5-15=42.5) - moved down
-            { x: 640, y: 220 },   // middlePlatform (top: 250-15=235, rune: 235-15=220) - moved down, still above pillar top at y: 300
-            { x: 640, y: 40 },    // topPlatform (top: 70-15=55, rune: 55-15=40) - moved down
-            { x: 130, y: 72 },    // leftVineTopPlatform (top: 100-12.5=87.5, rune: 87.5-15=72.5) - adjusted for new position
-            { x: 1150, y: 72 }    // rightVineTopPlatform (top: 100-12.5=87.5, rune: 87.5-15=72.5) - adjusted for new position
+        // HARDCODED: All positions that could be behind pillars or puzzles are excluded
+        const allPossiblePositions = [
+            { x: 300, y: 332 },   // leftPlatform1
+            { x: 980, y: 332 },   // rightPlatform1
+            { x: 400, y: 242 },   // leftPlatform2
+            { x: 880, y: 242 },   // rightPlatform2
+            { x: 450, y: 102 },   // leftPlatform3
+            { x: 830, y: 102 },   // rightPlatform3
+            { x: 500, y: 42 },    // leftPlatform4
+            { x: 780, y: 42 },    // rightPlatform4
+            { x: 130, y: 72 },    // leftVineTopPlatform
+            { x: 1150, y: 72 }    // rightVineTopPlatform
         ];
+        
+        // HARDCODED: Define pillar and puzzle positions to avoid
+        // Pillars: left (130, 217), middle (640, 350), right (1150, 217)
+        // Vine block puzzle: middle platform (640, 250) - vineFlowIndicator
+        // Wind totem: top platform (640, 55)
+        const blockedAreas = [
+            { x: 130, y: 217, radius: 60 },   // Left pillar (80 wide, 100 tall, so ~60 radius)
+            { x: 640, y: 350, radius: 60 },   // Middle pillar
+            { x: 1150, y: 217, radius: 60 },  // Right pillar
+            { x: 640, y: 250, radius: 200 },  // Vine block puzzle (middle platform, 400 wide)
+            { x: 640, y: 55, radius: 150 }    // Wind totem (top platform, 300 wide)
+        ];
+        
+        // Filter out positions that are too close to pillars or puzzles
+        this.reachablePlatformPositions = allPossiblePositions.filter(pos => {
+            // Check if position is too close to any blocked area
+            for (const blocked of blockedAreas) {
+                const distance = Phaser.Math.Distance.Between(pos.x, pos.y, blocked.x, blocked.y);
+                if (distance < blocked.radius) {
+                    return false; // Too close, exclude this position
+                }
+            }
+            return true; // Safe position, keep it
+        });
         
         // Track which player is carrying which rune
         this.player1.carriedRune = null;
@@ -1190,17 +1214,50 @@ export class Start extends Phaser.Scene {
             this.middleRuneSpawnTimer -= 1/60; // Decrement by frame time (60 FPS)
             if (this.middleRuneSpawnTimer <= 0) {
                 this.middleRuneSpawnTimer = 0;
-                // Spawn middle rune at random reachable platform position
-                const randomPos = Phaser.Utils.Array.GetRandom(this.reachablePlatformPositions);
-                middleRune.x = randomPos.x;
-                middleRune.y = randomPos.y;
-                middleRune.glow.x = randomPos.x;
-                middleRune.glow.y = randomPos.y;
-                middleRune.setVisible(true);
-                middleRune.glow.setVisible(true);
-                middleRune.collected = false;
-                this.middleRuneSpawned = true;
-                this.middleRuneTimerText.setVisible(false);
+                // HARDCODED: Spawn middle rune at random reachable platform position
+                // Filter out any positions that might be behind pillars or puzzles
+                const safePositions = this.reachablePlatformPositions.filter(pos => {
+                    // Double-check against current pillar and puzzle positions
+                    const blockedAreas = [
+                        { x: 130, y: 217, radius: 60 },   // Left pillar
+                        { x: 640, y: 350, radius: 60 },   // Middle pillar
+                        { x: 1150, y: 217, radius: 60 },   // Right pillar
+                        { x: 640, y: 250, radius: 200 },  // Vine block puzzle
+                        { x: 640, y: 55, radius: 150 }     // Wind totem
+                    ];
+                    for (const blocked of blockedAreas) {
+                        const distance = Phaser.Math.Distance.Between(pos.x, pos.y, blocked.x, blocked.y);
+                        if (distance < blocked.radius) {
+                            return false;
+                        }
+                    }
+                    return true;
+                });
+                
+                // Only spawn if we have safe positions
+                if (safePositions.length > 0) {
+                    const randomPos = Phaser.Utils.Array.GetRandom(safePositions);
+                    middleRune.x = randomPos.x;
+                    middleRune.y = randomPos.y;
+                    middleRune.glow.x = randomPos.x;
+                    middleRune.glow.y = randomPos.y;
+                    middleRune.setVisible(true);
+                    middleRune.glow.setVisible(true);
+                    middleRune.collected = false;
+                    this.middleRuneSpawned = true;
+                    this.middleRuneTimerText.setVisible(false);
+                } else {
+                    // Fallback: spawn at a guaranteed safe position if all are blocked
+                    middleRune.x = 300;
+                    middleRune.y = 332;
+                    middleRune.glow.x = 300;
+                    middleRune.glow.y = 332;
+                    middleRune.setVisible(true);
+                    middleRune.glow.setVisible(true);
+                    middleRune.collected = false;
+                    this.middleRuneSpawned = true;
+                    this.middleRuneTimerText.setVisible(false);
+                }
             } else {
                 // Update timer text
                 const seconds = Math.ceil(this.middleRuneSpawnTimer);
@@ -1240,60 +1297,75 @@ export class Start extends Phaser.Scene {
         });
         
         // Update pillar placement - players press W/Up arrow near pillar to place rune
+        // HARDCODED: Any rune can be placed in any pillar
         this.runesPillars.forEach((pillar, index) => {
-            const p1Near = Phaser.Math.Distance.Between(this.player1.x, this.player1.y, pillar.x, pillar.y) < 60;
-            const p2Near = Phaser.Math.Distance.Between(this.player2.x, this.player2.y, pillar.x, pillar.y) < 60;
+            // Increase distance check for middle pillar (index 1) to make it easier to place runes
+            const distanceThreshold = index === 1 ? 80 : 60; // Middle pillar gets larger interaction radius
+            const p1Near = Phaser.Math.Distance.Between(this.player1.x, this.player1.y, pillar.x, pillar.y) < distanceThreshold;
+            const p2Near = Phaser.Math.Distance.Between(this.player2.x, this.player2.y, pillar.x, pillar.y) < distanceThreshold;
             
-            // Player 1 places rune (can contest existing runes)
-            if (p1Near && this.player1.carriedRune !== null && this.player1.carriedRune === index) {
+            // Player 1 places rune - ANY rune can be placed in ANY pillar
+            if (p1Near && this.player1.carriedRune !== null) {
                 const wPressed = Phaser.Input.Keyboard.JustDown(this.wKey);
                 if (wPressed) {
+                    // Hide the rune that was placed
+                    const placedRuneIndex = this.player1.carriedRune;
+                    const placedRune = this.runes[placedRuneIndex];
+                    if (placedRune) {
+                        placedRune.setVisible(false);
+                        placedRune.glow.setVisible(false);
+                        placedRune.collected = false;
+                    }
+                    
+                    // Place rune in pillar
                     pillar.hasRune = true;
                     pillar.owner = this.player1.faction;
                     pillar.setFillStyle(0xFFD700); // Gold for Solari
                     pillar.glow.setFillStyle(0xFFD700);
                     pillar.glow.setAlpha(0.6);
                     this.player1.carriedRune = null;
-                    // Only middle rune respawns (randomly after 25s)
-                    if (index === 1) {
-                        // Middle rune - respawn randomly after 25 seconds
+                    
+                    // If middle rune was placed, respawn it after 25 seconds
+                    if (placedRuneIndex === 1) {
                         this.middleRuneSpawned = false;
                         this.middleRuneSpawnTimer = 25;
                         this.middleRuneTimerText.setVisible(true);
-                        const rune = this.runes[index];
-                        rune.setVisible(false);
-                        rune.glow.setVisible(false);
                     }
-                    // Left/Right runes do NOT respawn - they are one-time collectibles
                 }
             }
             
-            // Player 2 places rune (can contest existing runes)
-            if (p2Near && this.player2.carriedRune !== null && this.player2.carriedRune === index) {
+            // Player 2 places rune - ANY rune can be placed in ANY pillar
+            if (p2Near && this.player2.carriedRune !== null) {
                 const upPressed = Phaser.Input.Keyboard.JustDown(this.upKey);
                 if (upPressed) {
+                    // Hide the rune that was placed
+                    const placedRuneIndex = this.player2.carriedRune;
+                    const placedRune = this.runes[placedRuneIndex];
+                    if (placedRune) {
+                        placedRune.setVisible(false);
+                        placedRune.glow.setVisible(false);
+                        placedRune.collected = false;
+                    }
+                    
+                    // Place rune in pillar
                     pillar.hasRune = true;
                     pillar.owner = this.player2.faction;
                     pillar.setFillStyle(0x8B00FF); // Purple for Umbrae
                     pillar.glow.setFillStyle(0x8B00FF);
                     pillar.glow.setAlpha(0.6);
                     this.player2.carriedRune = null;
-                    // Only middle rune respawns (randomly after 25s)
-                    if (index === 1) {
-                        // Middle rune - respawn randomly after 25 seconds
+                    
+                    // If middle rune was placed, respawn it after 25 seconds
+                    if (placedRuneIndex === 1) {
                         this.middleRuneSpawned = false;
                         this.middleRuneSpawnTimer = 25;
                         this.middleRuneTimerText.setVisible(true);
-                        const rune = this.runes[index];
-                        rune.setVisible(false);
-                        rune.glow.setVisible(false);
                     }
-                    // Left/Right runes do NOT respawn - they are one-time collectibles
                 }
             }
             
-            // Visual feedback - show glow when player is near with correct rune
-            if ((p1Near && this.player1.carriedRune === index) || (p2Near && this.player2.carriedRune === index)) {
+            // Visual feedback - show glow when player is near with ANY rune
+            if ((p1Near && this.player1.carriedRune !== null) || (p2Near && this.player2.carriedRune !== null)) {
                 pillar.glow.setAlpha(0.4);
                 pillar.glow.setFillStyle(0xffff00); // Yellow hint
             } else if (!pillar.hasRune) {
@@ -1301,26 +1373,23 @@ export class Start extends Phaser.Scene {
             }
         });
         
-        // Calculate influence based on pillars owned
+        // HARDCODED: Calculate influence based on pillars owned - always works correctly
         let solariPillars = 0;
         let umbraePillars = 0;
         
+        // Count pillars owned by each faction
         this.runesPillars.forEach(pillar => {
             if (pillar.hasRune && pillar.owner === 'Solari') {
                 solariPillars++;
-            } else if (pillar.hasRune && pillar.owner === 'Umbrae') {
+            }
+            if (pillar.hasRune && pillar.owner === 'Umbrae') {
                 umbraePillars++;
             }
         });
         
-        // Set influence: 2/sec (1 pillar), 4/sec (2), 6/sec (3)
-        if (solariPillars > 0) {
-            this.puzzleInfluence.forestRunes = solariPillars * 2;
-        } else if (umbraePillars > 0) {
-            this.puzzleInfluence.forestRunes = -(umbraePillars * 2);
-        } else {
-            this.puzzleInfluence.forestRunes = 0;
-        }
+        // HARDCODED: Set influence - 2/sec per pillar (1=2, 2=4, 3=6)
+        // Solari gets positive, Umbrae gets negative (will be converted to positive in update)
+        this.puzzleInfluence.forestRunes = (solariPillars * 2) - (umbraePillars * 2);
     }
 
     updateVineFlowPuzzle() {
@@ -1329,23 +1398,23 @@ export class Start extends Phaser.Scene {
         // Middle platform bounds: x: 640, y: 250, width: 400, height: 30
         // Platform horizontal range: 440 to 840 (640 ± 200)
         // Platform top: y: 235 (250 - 15)
-        // Player must be on the platform to trigger (within platform bounds and on top)
+        // Player must be on the platform to trigger (within platform bounds and standing on top)
         const platformLeft = 440;
         const platformRight = 840;
         const platformTop = 235;
-        const platformBottom = 265; // 250 + 15
         
-        // Check if player 1 is on the middle platform
-        const p1OnPlatform = this.player1.x >= platformLeft && 
-                           this.player1.x <= platformRight &&
-                           this.player1.y >= platformTop && 
-                           this.player1.y <= platformBottom;
+        // Check if player is on the middle platform
+        // Player is 50x50, so player bottom = player.y + 25
+        // Player is on platform if: horizontal overlap AND player bottom is on platform top
+        const checkPlayerOnPlatform = (player) => {
+            const playerBottom = player.y + 25; // Player height is 50, so bottom = center + 25
+            const horizontalOverlap = player.x >= platformLeft && player.x <= platformRight;
+            const onPlatformTop = playerBottom >= platformTop - 5 && playerBottom <= platformTop + 15 && player.body.touching.down;
+            return horizontalOverlap && onPlatformTop;
+        };
         
-        // Check if player 2 is on the middle platform
-        const p2OnPlatform = this.player2.x >= platformLeft && 
-                           this.player2.x <= platformRight &&
-                           this.player2.y >= platformTop && 
-                           this.player2.y <= platformBottom;
+        const p1OnPlatform = checkPlayerOnPlatform(this.player1);
+        const p2OnPlatform = checkPlayerOnPlatform(this.player2);
         
         // Only trigger if player is on the platform and near the indicator
         const horizontalDist1 = Math.abs(this.player1.x - indicator.x);
@@ -1443,9 +1512,28 @@ export class Start extends Phaser.Scene {
     updateWindTotem() {
         const totem = this.windTotem;
         
-        // Check if players are near totem (within 80 pixels)
-        const p1Near = Phaser.Math.Distance.Between(this.player1.x, this.player1.y, totem.x, totem.y) < 80;
-        const p2Near = Phaser.Math.Distance.Between(this.player2.x, this.player2.y, totem.x, totem.y) < 80;
+        // Top platform bounds: x=640, y=70, width=300, height=30
+        // Platform top = 70 - 15 = 55, Platform bottom = 70 + 15 = 85
+        // Platform left = 640 - 150 = 490, Platform right = 640 + 150 = 790
+        const topPlatformTop = 55;
+        const topPlatformBottom = 85;
+        const topPlatformLeft = 490;
+        const topPlatformRight = 790;
+        
+        // Check if players are near totem AND on the top platform
+        const checkPlayerOnTopPlatform = (player) => {
+            const playerBottom = player.y + 25; // Player is 50x50, so bottom = y + 25
+            const playerTop = player.y - 25;
+            const isNearTotem = Phaser.Math.Distance.Between(player.x, player.y, totem.x, totem.y) < 80;
+            const isOnTopPlatform = player.x >= topPlatformLeft && player.x <= topPlatformRight &&
+                                   playerBottom >= topPlatformTop - 5 && playerBottom <= topPlatformTop + 15 &&
+                                   playerTop <= topPlatformBottom &&
+                                   player.body.touching.down; // Must be touching ground/platform
+            return isNearTotem && isOnTopPlatform;
+        };
+        
+        const p1Near = checkPlayerOnTopPlatform(this.player1);
+        const p2Near = checkPlayerOnTopPlatform(this.player2);
         
         // Show a circular key indicator above each player when they walk up to the totem
         const updateTotemIndicator = (player, near) => {
@@ -1475,7 +1563,7 @@ export class Start extends Phaser.Scene {
         updateTotemIndicator(this.player2, p2Near);
         
         // Handle interaction with totem (press W for Player 1, Up Arrow for Player 2)
-        // Only allow if no game is currently active and player is not teleporting
+        // Only allow if no game is currently active, player is not teleporting, AND player is on top platform
         if (p1Near && Phaser.Input.Keyboard.JustDown(this.wKey) && !this.simonSaysP1.active && !this.simonSaysP2.active && !totem.cooldownActive && !this.player1.teleporting) {
             this.teleportToTV(this.player1, this.simonSaysP1);
         }
@@ -2557,14 +2645,21 @@ export class Start extends Phaser.Scene {
             umbraeInfluencePerSec += this.puzzleInfluence.windTotemUmbrae;
         }
         
-        // Forest Runes influence (2/sec per pillar: 1=2, 2=4, 3=6)
-        if (this.puzzleInfluence.forestRunes) {
-            if (this.puzzleInfluence.forestRunes > 0) {
-                solariInfluencePerSec += this.puzzleInfluence.forestRunes;
-            } else {
-                umbraeInfluencePerSec += Math.abs(this.puzzleInfluence.forestRunes);
+        // HARDCODED: Forest Runes influence (2/sec per pillar: 1=2, 2=4, 3=6) - always works
+        // Count pillars directly to ensure it always works
+        let solariPillarCount = 0;
+        let umbraePillarCount = 0;
+        this.runesPillars.forEach(pillar => {
+            if (pillar.hasRune && pillar.owner === 'Solari') {
+                solariPillarCount++;
             }
-        }
+            if (pillar.hasRune && pillar.owner === 'Umbrae') {
+                umbraePillarCount++;
+            }
+        });
+        // Apply influence directly - 2/sec per pillar
+        solariInfluencePerSec += solariPillarCount * 2;
+        umbraeInfluencePerSec += umbraePillarCount * 2;
         
         // Vine Pattern influence (if implemented)
         if (this.puzzleInfluence.vinePattern) {

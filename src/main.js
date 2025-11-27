@@ -1,6 +1,8 @@
 import { Menu } from './scenes/Menu.js';
 import { HowToPlay } from './scenes/HowToPlay.js';
 import { Start } from './scenes/Start.js';
+import { LevelSelect } from './scenes/LevelSelect.js';
+import { Volcano } from './scenes/Volcano.js';
 
 const config = {
     type: Phaser.AUTO,
@@ -21,7 +23,9 @@ const config = {
     scene: [
         Menu,
         HowToPlay,
-        Start
+        LevelSelect,
+        Start,
+        Volcano
     ],
     scale: {
         mode: Phaser.Scale.FIT,
