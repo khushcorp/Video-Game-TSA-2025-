@@ -74,55 +74,59 @@ export class LevelSelect extends Phaser.Scene {
             forestCard.setStrokeStyle(3, 0xffffff);
         });
 
-        // Volcano Level Card - positioned on the right (LOCKED - Work in Progress)
+        // Volcano Level Card - positioned on the right
         const volcanoCardX = width / 2 + cardSpacing;
         const volcanoCard = this.add.rectangle(volcanoCardX, cardY, cardWidth, cardHeight, 0xFF4500);
-        volcanoCard.setStrokeStyle(3, 0x666666);
-        volcanoCard.setAlpha(0.5); // Dimmed to show it's locked
-        volcanoCard.setInteractive({ useHandCursor: false }); // Disabled cursor
+        volcanoCard.setStrokeStyle(3, 0xffffff);
+        volcanoCard.setAlpha(0.8);
+        volcanoCard.setInteractive({ useHandCursor: true });
         
-        // Large lock symbol - centered on card
-        const lockX = volcanoCardX;
-        const lockY = cardY - 30;
-        
-        // Large lock body (rectangle)
-        const lockBody = this.add.rectangle(lockX, lockY + 25, 80, 70, 0x888888);
-        lockBody.setStrokeStyle(5, 0xaaaaaa);
-        lockBody.disableInteractive();
-        
-        // Large lock shackle (semicircle on top)
-        const lockShackle = this.add.arc(lockX, lockY, 40, 180, 0, false, 0x888888);
-        lockShackle.setStrokeStyle(5, 0xaaaaaa);
-        lockShackle.disableInteractive();
-        
-        // Work in Progress message
-        const wipText = this.add.text(volcanoCardX, cardY + 100, 'WORK IN PROGRESS', {
-            fontSize: '24px',
-            fill: '#ff0000',
-            fontStyle: 'bold',
-            stroke: '#000000',
-            strokeThickness: 4
-        }).setOrigin(0.5);
-        wipText.disableInteractive();
-        
-        // Volcano title only
+        // Volcano card text and decorations
         const volcanoTitle = this.add.text(volcanoCardX, cardY - 120, 'VOLCANO', {
             fontSize: '36px',
-            fill: '#888888',
+            fill: '#ffffff',
             fontStyle: 'bold',
             stroke: '#000000',
             strokeThickness: 3
         }).setOrigin(0.5);
         volcanoTitle.disableInteractive();
         
-        // Volcano card interactions - DISABLED (locked)
+        const volcanoDesc = this.add.text(volcanoCardX, cardY + 100, 'A dangerous volcanic landscape with falling platforms', {
+            fontSize: '16px',
+            fill: '#ffffff',
+            align: 'center',
+            wordWrap: { width: cardWidth - 40 },
+            stroke: '#000000',
+            strokeThickness: 2
+        }).setOrigin(0.5);
+        volcanoDesc.disableInteractive();
+        
+        // Volcano decorations
+        const volcanoShape = this.add.polygon(volcanoCardX, cardY + 20, [
+            -40, 20,
+            0, -40,
+            40, 20
+        ], 0xFF4500);
+        volcanoShape.disableInteractive();
+        const volcanoCircle1 = this.add.circle(volcanoCardX, cardY - 10, 20, 0xFF6347);
+        volcanoCircle1.disableInteractive();
+        const volcanoCircle2 = this.add.circle(volcanoCardX - 15, cardY - 5, 8, 0xFFD700);
+        volcanoCircle2.disableInteractive();
+        const volcanoCircle3 = this.add.circle(volcanoCardX + 15, cardY - 5, 8, 0xFFD700);
+        volcanoCircle3.disableInteractive();
+        
+        // Volcano card interactions
+        volcanoCard.on('pointerdown', () => {
+            this.scene.start('Volcano');
+        });
         volcanoCard.on('pointerover', () => {
-            // No hover effect - card is locked
+            volcanoCard.setScale(1.05);
+            volcanoCard.setStrokeStyle(4, 0xFF6347);
         });
         volcanoCard.on('pointerout', () => {
-            // No hover effect - card is locked
+            volcanoCard.setScale(1);
+            volcanoCard.setStrokeStyle(3, 0xffffff);
         });
-        // No pointerdown handler - card is locked and cannot be clicked
 
         // Back button
         const backButton = this.add.rectangle(width / 2, height - 80, 200, 50, 0x444444);
