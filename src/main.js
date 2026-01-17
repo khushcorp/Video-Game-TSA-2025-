@@ -17,9 +17,10 @@ const config = {
     width: gameWidth,
     height: gameHeight,
     backgroundColor: '#1a1a2e',
-    pixelArt: false,      // standard rendering for vector graphics
+    pixelArt: true,      // pixel-art rendering
     roundPixels: true,   // snap to whole pixels
-    antialias: true,     // smooth edges for circles and text
+    antialias: false,    // keep sprites sharp
+    render: { pixelArt: true, antialias: false },
     physics: {
         default: 'arcade',
         arcade: {
@@ -35,8 +36,10 @@ const config = {
         Volcano
     ],
     scale: {
-        mode: Phaser.Scale.FIT, // Scale the game to fit the window
+        mode: Phaser.Scale.RESIZE, // Scale the game to fill the window
         autoCenter: Phaser.Scale.CENTER_BOTH,
+        width: '100%',
+        height: '100%',
         parent: 'game-container'
     },
 };

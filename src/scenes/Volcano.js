@@ -1,20 +1,21 @@
 // Volcano Level - Redesigned with calculated platform spacing
 export class Volcano extends Phaser.Scene {
     constructor() { super('Volcano'); }
-    preload() {}
+    preload() {
+        this.load.image('volcano', 'assets/volcano.webp');
+    }
 
     create() {
         // ===== LEVEL SETUP =====
         this.cameras.main.setZoom(0.7);
-        this.cameras.main.setBounds(0, 0, 1828, 1028);
+        this.centerGameplayCamera();
         
         // Set physics world bounds
         this.physics.world.setBounds(0, 0, 1828, 1028);
         
         // ===== BACKGROUND =====
-        this.add.rectangle(914, 360, 1828, 720, 0x1a0a0a);
-        this.add.rectangle(914, 180, 1828, 200, 0x2d1a1a);
-        this.add.rectangle(914, 600, 1828, 300, 0x0a0505);
+        this.createBackground();
+        this.scale.on('resize', this.centerGameplayCamera, this);
         
         // Lava glow effects
         for (let i = 0; i < 5; i++) {
@@ -230,10 +231,10 @@ export class Volcano extends Phaser.Scene {
         // Ground platform at bottom of screen - HARDCODED VALUES
         // World height: 1028, ground height: 114
         // HARDCODED: Ground center Y = 971, Ground top Y = 914
+        const HARDCODED_GROUND_HEIGHT = 114;
         const HARDCODED_GROUND_CENTER_X = 914;
         const HARDCODED_GROUND_CENTER_Y = 971;
         const HARDCODED_GROUND_TOP = 914;
-        const HARDCODED_GROUND_HEIGHT = 114;
         const HARDCODED_GROUND_WIDTH = 2000;
         
         const ground = this.add.rectangle(HARDCODED_GROUND_CENTER_X, HARDCODED_GROUND_CENTER_Y, HARDCODED_GROUND_WIDTH, HARDCODED_GROUND_HEIGHT, 0x4a1a0a);
@@ -528,6 +529,19 @@ export class Volcano extends Phaser.Scene {
         this.influenceReward = null;
     }
 
+    centerGameplayCamera() {
+        const worldWidth = 1828;
+        const worldHeight = 1028;
+        const zoom = this.cameras.main ? (this.cameras.main.zoom || 1) : 1;
+        const viewWidth = this.scale.width / zoom;
+        const viewHeight = this.scale.height / zoom;
+        const padX = Math.max(0, (viewWidth - worldWidth) / 2);
+        const padY = Math.max(0, (viewHeight - worldHeight) / 2);
+
+        this.cameras.main.setBounds(-padX, -padY, worldWidth + padX * 2, worldHeight + padY * 2);
+        this.cameras.main.centerOn(worldWidth / 2, worldHeight / 2);
+    }
+
     update(time, delta) {
         const dt = delta / 1000;
         
@@ -614,6 +628,43 @@ export class Volcano extends Phaser.Scene {
         
         this.updateFaultlinePuzzle(dt);
         this.updateInfluence(dt);
+    }
+
+    createBackground() {
+        this.backgroundLayer = this.add.layer();
+        this.backgroundLayer.setDepth(-100);
+        const background = this.add.image(0, 0, 'volcano');
+        background.setOrigin(0.5, 0.5);
+        background.setDepth(-100);
+        background.setScrollFactor(0, 0);
+        const texture = this.textures.get('volcano');
+        if (texture) {
+            texture.setFilter(Phaser.Textures.FilterMode.NEAREST);
+        }
+        this.backgroundLayer.add(background);
+        this.volcanoBackground = background;
+        this.resizeBackground();
+        this.scale.on('resize', this.resizeBackground, this);
+    }
+
+    resizeBackground() {
+        if (!this.volcanoBackground) return;
+        const width = this.scale.width;
+        const height = this.scale.height;
+        const zoom = this.cameras.main ? (this.cameras.main.zoom || 1) : 1;
+        
+        // Get original dimensions of the image
+        const bgWidth = this.volcanoBackground.width;
+        const bgHeight = this.volcanoBackground.height;
+        
+        // Calculate the 'Cover' scale against the screen, compensating for camera zoom
+        const scaleX = width / bgWidth;
+        const scaleY = height / bgHeight;
+        const scale = Math.max(scaleX, scaleY) / zoom;
+        
+        // Apply scale and center on the screen
+        this.volcanoBackground.setScale(scale);
+        this.volcanoBackground.setPosition(width / 2, height / 2);
     }
     
     updateLavaOrbs(dt) {
