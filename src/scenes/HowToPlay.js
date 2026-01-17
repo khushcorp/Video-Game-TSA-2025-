@@ -17,7 +17,7 @@ export class HowToPlay extends Phaser.Scene {
         const scrollArea = this.add.container(0, 0);
         scrollArea.setSize(width, height - 100);
         scrollArea.setPosition(0, 80);
-        
+
         // Scrollable content container
         this.contentContainer = this.add.container(width / 2, 0);
         scrollArea.add(this.contentContainer);
@@ -37,7 +37,7 @@ export class HowToPlay extends Phaser.Scene {
             wordWrap: { width: width - 80 },
             lineSpacing: 6
         }).setOrigin(0.5, 0);
-        
+
         this.contentContainer.add(textObject);
         
         // Scroll indicators
@@ -59,7 +59,7 @@ export class HowToPlay extends Phaser.Scene {
         this.pageUpKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.PAGE_UP);
         this.pageDownKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.PAGE_DOWN);
         this.spaceKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
-        
+
         // Touch scrolling for mobile
         this.isDragging = false;
         this.lastTouchY = 0;
@@ -83,7 +83,7 @@ export class HowToPlay extends Phaser.Scene {
         this.input.on('pointerup', () => {
             this.isDragging = false;
         });
-        
+
         // Back button (always visible)
         const backButton = this.add.rectangle(width / 2, height - 20, 200, 40, 0x444444);
         backButton.setStrokeStyle(2, 0xffffff);

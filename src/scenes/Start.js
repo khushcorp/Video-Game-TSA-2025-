@@ -956,7 +956,7 @@ export class Start extends Phaser.Scene {
                     this.player1.body.setVelocityX(200); // Jump right
                 }
                 this.player1.wWasDown = false;
-            }
+            } 
             // Climb up with W held or pressed (smooth continuous climbing - W alone does NOT jump)
             else if (wHeld || wPressed) {
                 this.player1.body.setGravityY(0);
@@ -1088,7 +1088,7 @@ export class Start extends Phaser.Scene {
                     this.player2.body.setVelocityX(200); // Jump right
                 }
                 this.player2.upWasDown = false;
-            }
+            } 
             // Climb up with Up Arrow held or pressed (smooth continuous climbing - Up alone does NOT jump)
             else if (upHeld || upPressed) {
                 this.player2.body.setGravityY(0);
@@ -1233,7 +1233,7 @@ export class Start extends Phaser.Scene {
                     }
                     return true;
                 });
-                
+            
                 // Only spawn if we have safe positions
                 if (safePositions.length > 0) {
                     const randomPos = Phaser.Utils.Array.GetRandom(safePositions);
@@ -1260,11 +1260,11 @@ export class Start extends Phaser.Scene {
                 }
             } else {
                 // Update timer text
-                const seconds = Math.ceil(this.middleRuneSpawnTimer);
+                const seconds = Math.floor(this.middleRuneSpawnTimer);
                 this.middleRuneTimerText.setText(`Rune: ${seconds}s`);
             }
-        }
-        
+            }
+            
         // Update rune collection - players walk into runes to pick them up
         this.runes.forEach((rune, index) => {
             // Skip if rune is not visible (middle rune before spawn)
@@ -1281,7 +1281,7 @@ export class Start extends Phaser.Scene {
             // Check if players are near the rune
             const p1Near = Phaser.Math.Distance.Between(this.player1.x, this.player1.y, rune.x, rune.y) < 30;
             const p2Near = Phaser.Math.Distance.Between(this.player2.x, this.player2.y, rune.x, rune.y) < 30;
-            
+                
             // Player walks into rune to collect it
             if (p1Near && !this.player1.carriedRune) {
                 rune.collected = true;
@@ -1330,7 +1330,7 @@ export class Start extends Phaser.Scene {
                         this.middleRuneSpawned = false;
                         this.middleRuneSpawnTimer = 25;
                         this.middleRuneTimerText.setVisible(true);
-                    }
+                }
                 }
             }
             
@@ -2377,7 +2377,7 @@ export class Start extends Phaser.Scene {
                     game.completed = false;
                     if (game.statusText) {
                         game.statusText.setText('WRONG! The vines resist your touch.');
-                        game.statusText.setFill('#ff0000');
+                    game.statusText.setFill('#ff0000');
                         game.statusText.setVisible(true);
                         game.statusText.setDepth(200);
                         game.statusText.setAlpha(1);
@@ -2492,7 +2492,7 @@ export class Start extends Phaser.Scene {
                 game.completed = false;
                 if (game.statusText) {
                     game.statusText.setText('TIME UP! The forest rejects your pattern.');
-                    game.statusText.setFill('#ff0000');
+                game.statusText.setFill('#ff0000');
                     game.statusText.setVisible(true);
                     game.statusText.setDepth(200);
                     game.statusText.setAlpha(1);
@@ -2553,8 +2553,8 @@ export class Start extends Phaser.Scene {
                             ? 'PERFECT! The vines answer to the Sun.' 
                             : 'PERFECT! The vines answer to Darkness.';
                         if (game.statusText) {
-                            game.statusText.setText(rewardText);
-                            game.statusText.setFill('#00ff00');
+                        game.statusText.setText(rewardText);
+                        game.statusText.setFill('#00ff00');
                             game.statusText.setVisible(true);
                             game.statusText.setDepth(200);
                             game.statusText.setAlpha(1);
