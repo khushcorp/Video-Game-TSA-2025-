@@ -13,8 +13,9 @@ export class Volcano extends Phaser.Scene {
         const worldWidth = 1280;
         const worldHeight = 720;
         
-        // Set physics world bounds
-        this.physics.world.setBounds(0, 0, worldWidth, worldHeight);
+        // Set physics world bounds - INCREASED HEIGHT so players can exist near ground (y=1050)
+        // This was the "invisible barrier" pushing players up!
+        this.physics.world.setBounds(0, 0, worldWidth, 2000);
         
         // Center camera on the level
         this.cameras.main.setBounds(0, 0, worldWidth, worldHeight);
@@ -86,9 +87,9 @@ export class Volcano extends Phaser.Scene {
         this.lavaEndTime = 0; 
         this.lavaEventNumber = 0; 
         
-        this.lavaStartY = 640; // New ground top
+        this.lavaStartY = this.HARDCODED_GROUND_TOP; // Dynamic ground top
         this.lavaTopY = 0; 
-        this.lavaCurrentY = 640;
+        this.lavaCurrentY = this.HARDCODED_GROUND_TOP;
         this.lava = null;
         this.lavaGlow = null;
         this.lavaParticles = [];
@@ -355,18 +356,22 @@ export class Volcano extends Phaser.Scene {
             this.textures.get('sci-fi-plate').setFilter(Phaser.Textures.FilterMode.NEAREST);
         }
 
-        const HARDCODED_GROUND_HEIGHT = 80;
-        const HARDCODED_GROUND_TOP = 640;
-        const HARDCODED_GROUND_CENTER_Y = 680;
+        // ===== GROUND =====
+        // Manually set your ground dimensions and position here
+        const groundX = 900;
+        const groundY = 1050;
+        const groundWidth = 2690;
+        const groundHeight = 225;
         
         // Ground using Magma Texture
-        const ground = this.add.tileSprite(1280/2, HARDCODED_GROUND_CENTER_Y, 2000, HARDCODED_GROUND_HEIGHT, 'magma-platform');
+        const ground = this.add.tileSprite(groundX, groundY, groundWidth, groundHeight, 'magma-platform');
         ground.setOrigin(0.5, 0.5).setDepth(1).setTileScale(1, 1);
         this.physics.add.existing(ground, true);
         this.platforms.push(ground);
         
-        this.groundTop = HARDCODED_GROUND_TOP;
-        this.HARDCODED_GROUND_TOP = HARDCODED_GROUND_TOP;
+        // Logical constants for gameplay (auto-calculated from your values above)
+        this.HARDCODED_GROUND_TOP = groundY - (groundHeight / 2);
+        this.groundTop = this.HARDCODED_GROUND_TOP;
         this.HARDCODED_PLAYER_HALF_HEIGHT = 35.5;
         this.scalesActive = false;
         this.previousScalesActive = false;
@@ -376,7 +381,7 @@ export class Volcano extends Phaser.Scene {
         
         // Create lava (adjusted for new ground)
         this.time.delayedCall(100, () => {
-            const lavaStartY = 640; 
+            const lavaStartY = this.HARDCODED_GROUND_TOP; 
             this.lavaStartY = lavaStartY;
             this.lavaCurrentY = lavaStartY;
             this.lava = this.add.rectangle(1280/2, lavaStartY, 2000, 0, 0xFF4500).setOrigin(0.5, 1.0).setDepth(999).setVisible(false);
@@ -483,11 +488,9 @@ export class Volcano extends Phaser.Scene {
         }
 
         const leftLadder = this.add.tileSprite(100, 400, 32, 480, 'ladder-pixel').setOrigin(0.5, 0.5);
-        this.physics.add.existing(leftLadder, true);
         this.vines.push(leftLadder);
         
         const rightLadder = this.add.tileSprite(1180, 400, 32, 480, 'ladder-pixel').setOrigin(0.5, 0.5);
-        this.physics.add.existing(rightLadder, true);
         this.vines.push(rightLadder);
         
         // ===== DRUM PLATES (Mechanic) =====
@@ -524,11 +527,12 @@ export class Volcano extends Phaser.Scene {
         });
         
         // ===== PLAYERS =====
-        const HARDCODED_PLAYER_SPAWN_Y = 640 - this.HARDCODED_PLAYER_HALF_HEIGHT; 
+        const spawnY = 900; 
         
-        this.player1 = this.add.rectangle(400, HARDCODED_PLAYER_SPAWN_Y, 71, 71, 0xFFD700).setOrigin(0.5, 0.5);
+        this.player1 = this.add.rectangle(400, spawnY, 71, 71, 0xFFD700).setOrigin(0.5, 0.5);
         this.physics.add.existing(this.player1);
-        this.player1.body.setCollideWorldBounds(true).setSize(71, 71).setGravityY(this.gravity);
+        // REMOVED setCollideWorldBounds(true) - This was another "invisible barrier" forcing players up
+        this.player1.body.setSize(71, 71).setGravityY(this.gravity);
         this.player1.setDepth(20).faction = 'Solari';
         this.player1.climbing = false;
         this.player1.onVine = null;
@@ -537,11 +541,11 @@ export class Volcano extends Phaser.Scene {
         this.player1.vineIndicator = null;
         this.player1.vineLatchCooldown = 0;
         this.player1.vineClimbSpeed = this.climbSpeed;
-        this.player1.y = HARDCODED_PLAYER_SPAWN_Y;
         
-        this.player2 = this.add.rectangle(880, HARDCODED_PLAYER_SPAWN_Y, 71, 71, 0x8B00FF).setOrigin(0.5, 0.5);
+        this.player2 = this.add.rectangle(880, spawnY, 71, 71, 0x8B00FF).setOrigin(0.5, 0.5);
         this.physics.add.existing(this.player2);
-        this.player2.body.setCollideWorldBounds(true).setSize(71, 71).setGravityY(this.gravity);
+        // REMOVED setCollideWorldBounds(true) - This was another "invisible barrier" forcing players up
+        this.player2.body.setSize(71, 71).setGravityY(this.gravity);
         this.player2.setDepth(20).faction = 'Umbrae';
         this.player2.climbing = false;
         this.player2.onVine = null;
@@ -550,9 +554,8 @@ export class Volcano extends Phaser.Scene {
         this.player2.vineIndicator = null;
         this.player2.vineLatchCooldown = 0;
         this.player2.vineClimbSpeed = this.climbSpeed;
-        this.player2.y = HARDCODED_PLAYER_SPAWN_Y;
         
-        this.HARDCODED_PLAYER_SPAWN_Y = HARDCODED_PLAYER_SPAWN_Y;
+        this.HARDCODED_PLAYER_SPAWN_Y = spawnY;
         
         this.platforms.forEach(platform => {
             const collider1 = this.physics.add.collider(this.player1, platform);
@@ -604,31 +607,32 @@ export class Volcano extends Phaser.Scene {
             }
 
             const value = countdownValues[currentIndex];
-            // CENTER OF DESIGN SPACE (1280x720)
-            const centerX = 640;
-            const centerY = 360;
+            
+            // Center of the ACTUAL screen (browser window)
+            const centerX = this.scale.width / 2;
+            const centerY = this.scale.height / 2;
 
             const text = this.add.text(centerX, centerY, value, {
-                fontSize: '180px',
+                fontSize: '120px', // Uniform size for numbers and GO!
                 fill: '#ffff00',
                 fontStyle: 'bold',
                 stroke: '#000000',
                 strokeThickness: 12,
                 resolution: 2
-            }).setOrigin(0.5).setScale(0).setDepth(30000); // Remove setScrollFactor(0) for world-centering consistency
+            }).setOrigin(0.5).setScale(0).setDepth(100000).setScrollFactor(0);
 
             // Level 5 Danger Animation: Scale from 0 to massive, then fade
             this.tweens.add({
                 targets: text,
-                scale: 4,
-                alpha: { from: 1, to: 0.5 },
+                scale: 2.5, // Uniform scale for numbers and GO!
+                alpha: 1, // Fully opaque yellow
                 duration: 800,
                 ease: 'Back.easeOut',
                 onComplete: () => {
                     this.tweens.add({
                         targets: text,
                         alpha: 0,
-                        scale: 6,
+                        scale: 3.5,
                         duration: 200,
                         onComplete: () => {
                             text.destroy();
@@ -645,7 +649,7 @@ export class Volcano extends Phaser.Scene {
 
     centerGameplayCamera() {
         const worldWidth = 1280;
-        const worldHeight = 720;
+        const worldHeight = 1200; // Match new ground height
         const zoom = this.cameras.main ? (this.cameras.main.zoom || 1) : 1;
         const viewWidth = this.scale.width / zoom;
         const viewHeight = this.scale.height / zoom;
@@ -682,13 +686,13 @@ export class Volcano extends Phaser.Scene {
         // Only force players to ground position if they're actually on the ground platform
         // Check if player is near ground level (within 50 pixels of ground top)
         if (!skipGroundCorrection) {
-            const groundTop = this.HARDCODED_GROUND_TOP;
+            const groundTop = this.groundTop;
             const playerBottom1 = this.player1.y + this.HARDCODED_PLAYER_HALF_HEIGHT;
             const playerBottom2 = this.player2.y + this.HARDCODED_PLAYER_HALF_HEIGHT;
             const isOnGround1 = this.player1.body.touching.down && Math.abs(playerBottom1 - groundTop) < 50;
             const isOnGround2 = this.player2.body.touching.down && Math.abs(playerBottom2 - groundTop) < 50;
             
-            // HARDCODED: Only correct position if player is actually on the ground AND not falling
+            // Only correct position if player is actually on the ground AND not falling
             // This prevents forcing player into ground when falling from high heights
             if (isOnGround1 && Math.abs(this.player1.body.velocity.y) < 10 && this.player1OrbBoostTimer === 0) {
                 const expectedY = groundTop - this.HARDCODED_PLAYER_HALF_HEIGHT;
@@ -1101,8 +1105,8 @@ export class Volcano extends Phaser.Scene {
         
         if (player.latchedToVine && player.onVine) {
             const vine = player.onVine;
-            const vineTop = vine.y - vine.height / 2;
-            const vineBottom = vine.y + vine.height / 2;
+            const vineTop = vine.getTopCenter().y;
+            const vineBottom = vine.getBottomCenter().y;
             const playerHalfHeight = this.HARDCODED_PLAYER_HALF_HEIGHT;
             
             player.x = vine.x;
@@ -1207,8 +1211,8 @@ export class Volcano extends Phaser.Scene {
         
         this.vines.forEach(vine => {
             const dist = Math.abs(player.x - vine.x);
-            const vineTop = vine.y - vine.height / 2;
-            const vineBottom = vine.y + vine.height / 2;
+            const vineTop = vine.getTopCenter().y;
+            const vineBottom = vine.getBottomCenter().y;
             const withinVineBounds = player.y >= vineTop - 30 && player.y <= vineBottom + 30;
             
             if (dist < 50 && dist < minDist && withinVineBounds) {
@@ -1437,7 +1441,7 @@ export class Volcano extends Phaser.Scene {
                     this.lava.setDepth(999);
                 } else {
                     // HARDCODED: Create lava if it doesn't exist (fallback)
-                    const lavaStartY = this.HARDCODED_GROUND_TOP || 640;
+                    const lavaStartY = this.HARDCODED_GROUND_TOP;
                     this.lava = this.add.rectangle(640, lavaStartY, 2000, 0, 0xFF4500);
                     this.lava.setOrigin(0.5, 1.0); // Origin at bottom
                     this.lava.setDepth(999);
@@ -1539,18 +1543,18 @@ export class Volcano extends Phaser.Scene {
             const easedProgress = 1 - Math.pow(1 - progress, 8);
             
             // HARDCODED: Calculate lava height (fills from bottom like water)
-            // Ground is at y=640, topmost platform is at y=100 (top at y=90)
-            // Lava should rise to just below top platform: 640 - 90 = 550 pixels
-            const maxLavaHeight = 550; // From ground (640) to just below top platform (90) = 550px
+            // Ground is at this.HARDCODED_GROUND_TOP, topmost platform is at y=100 (top at y=90)
+            // Lava should rise to just below top platform
+            const maxLavaHeight = this.HARDCODED_GROUND_TOP - 90; 
             const currentLavaHeight = maxLavaHeight * easedProgress;
-            this.lavaCurrentY = this.lavaStartY; // Keep bottom at ground level (640) - NEVER MOVES
+            this.lavaCurrentY = this.lavaStartY; // Keep bottom at ground level - NEVER MOVES
             
             // HARDCODED: Update lava height (fills from bottom like water)
             if (this.lava) {
                 // CRITICAL: Bottom stays at ground level, height increases upward
                 // Make sure the rectangle actually grows from the bottom
                 this.lava.height = currentLavaHeight; // Grow height upward from bottom
-                this.lava.y = this.lavaStartY; // Bottom always at ground level (640) - NEVER MOVES
+                this.lava.y = this.lavaStartY; // Bottom always at ground level - NEVER MOVES
                 this.lava.setVisible(true);
                 this.lava.setAlpha(1.0);
                 this.lava.setDepth(999);
@@ -1560,7 +1564,7 @@ export class Volcano extends Phaser.Scene {
                 console.error('LAVA OBJECT MISSING DURING RISE!');
                 // HARDCODED: Try to recreate lava if it's missing
                 if (!this.lava) {
-                    const lavaStartY = this.HARDCODED_GROUND_TOP || 640;
+                    const lavaStartY = this.HARDCODED_GROUND_TOP;
                     this.lava = this.add.rectangle(640, lavaStartY, 2000, 0, 0xFF4500);
                     this.lava.setOrigin(0.5, 1.0); // Origin at bottom center
                     this.lava.setDepth(999);
@@ -1713,22 +1717,19 @@ export class Volcano extends Phaser.Scene {
     }
     
     returnPlayersToStart() {
-        // HARDCODED: Return both players to their start positions ABOVE the ground
-        // Ground top is 640, player half height is 35.5
-        // Player should be at: 640 - 35.5 = 604.5 (ABOVE ground, not inside)
+        // Return both players to their start positions ABOVE the ground
         const player1StartX = 400;
-        const player1StartY = this.HARDCODED_GROUND_TOP - this.HARDCODED_PLAYER_HALF_HEIGHT; 
+        const spawnY = this.groundTop - this.HARDCODED_PLAYER_HALF_HEIGHT; 
         const player2StartX = 880;
-        const player2StartY = this.HARDCODED_GROUND_TOP - this.HARDCODED_PLAYER_HALF_HEIGHT; 
         
-        // HARDCODED: Reset player positions and velocities - DISABLE physics temporarily
+        // Reset player positions and velocities - DISABLE physics temporarily
         if (this.player1) {
-            // HARDCODED: Disable body temporarily to prevent ground collision interference
+            // Disable body temporarily to prevent ground collision interference
             this.player1.body.setEnable(false);
             this.player1.x = player1StartX;
-            this.player1.y = player1StartY; // 878.5 - ABOVE ground
+            this.player1.y = spawnY; // ABOVE ground
             this.player1.body.setVelocity(0, 0);
-            // HARDCODED: Re-enable body after positioning
+            // Re-enable body after positioning
             this.time.delayedCall(50, () => {
                 if (this.player1) {
                     this.player1.body.setEnable(true);
@@ -1738,12 +1739,12 @@ export class Volcano extends Phaser.Scene {
             });
         }
         if (this.player2) {
-            // HARDCODED: Disable body temporarily to prevent ground collision interference
+            // Disable body temporarily to prevent ground collision interference
             this.player2.body.setEnable(false);
             this.player2.x = player2StartX;
-            this.player2.y = player2StartY; // 878.5 - ABOVE ground
+            this.player2.y = spawnY; // ABOVE ground
             this.player2.body.setVelocity(0, 0);
-            // HARDCODED: Re-enable body after positioning
+            // Re-enable body after positioning
             this.time.delayedCall(50, () => {
                 if (this.player2) {
                     this.player2.body.setEnable(true);

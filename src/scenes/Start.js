@@ -9,6 +9,107 @@ export class Start extends Phaser.Scene {
     }
 
     create() {
+        // ===== TEXTURES =====
+        if (!this.textures.exists('vine-pixel')) {
+            const vineCanvas = this.textures.createCanvas('vine-pixel', 32, 32);
+            const ctx = vineCanvas.context;
+
+            // Base stem (twisted look)
+            ctx.fillStyle = '#1B3D0A'; // Darker green for depth
+            ctx.fillRect(12, 0, 8, 32);
+            
+            // Stem detail/shadow
+            ctx.fillStyle = '#0F2405';
+            ctx.fillRect(12, 0, 3, 32);
+            
+            // Thorns/Little branches
+            ctx.fillStyle = '#3D6B1F';
+            ctx.fillRect(10, 8, 2, 2);
+            ctx.fillRect(20, 18, 2, 2);
+            ctx.fillRect(10, 28, 2, 2);
+
+            // Large Leaves (Pixel Art Style)
+            ctx.fillStyle = '#2D5016'; // Main leaf color
+            
+            // Leaf 1 (Left)
+            ctx.fillRect(4, 4, 8, 6);
+            ctx.fillRect(6, 2, 4, 2);
+            ctx.fillRect(6, 10, 4, 2);
+            
+            // Leaf 2 (Right)
+            ctx.fillRect(20, 14, 8, 6);
+            ctx.fillRect(22, 12, 4, 2);
+            ctx.fillRect(22, 20, 4, 2);
+            
+            // Leaf 3 (Left)
+            ctx.fillRect(4, 24, 8, 6);
+            ctx.fillRect(6, 22, 4, 2);
+            ctx.fillRect(6, 30, 4, 2);
+
+            // Highlights
+            ctx.fillStyle = '#4A8C2D';
+            ctx.fillRect(6, 5, 3, 2);
+            ctx.fillRect(22, 15, 3, 2);
+            ctx.fillRect(6, 25, 3, 2);
+            
+            // Tiny glowy bits/flowers for "Really Cool" effect
+            ctx.fillStyle = '#89B84C';
+            ctx.fillRect(10, 6, 2, 2);
+            ctx.fillRect(20, 16, 2, 2);
+            ctx.fillRect(10, 26, 2, 2);
+
+            vineCanvas.refresh();
+        }
+
+        if (!this.textures.exists('totem-pixel')) {
+            const totemCanvas = this.textures.createCanvas('totem-pixel', 40, 50);
+            const ctx = totemCanvas.context;
+
+            // Main body (Gold/Tan base with shading)
+            ctx.fillStyle = '#B8860B'; // Dark gold
+            ctx.fillRect(8, 5, 24, 40);
+            ctx.fillStyle = '#FFD700'; // Gold
+            ctx.fillRect(10, 7, 20, 36);
+
+            // Shading/Depth
+            ctx.fillStyle = '#DAA520'; // Goldenrod
+            ctx.fillRect(25, 7, 5, 36);
+
+            // Intricate Rune Designs (Deep Emerald Green)
+            ctx.fillStyle = '#006400';
+            ctx.fillRect(14, 15, 12, 2); // Top rune
+            ctx.fillRect(14, 25, 12, 2); // Middle rune
+            ctx.fillRect(14, 35, 12, 2); // Bottom rune
+            ctx.fillRect(19, 15, 2, 22); // Vertical connecting rune
+
+            // Face (Glowy Cyan Eyes)
+            ctx.fillStyle = '#00FFFF'; // Cyan
+            ctx.fillRect(12, 10, 4, 4); // Left eye
+            ctx.fillRect(24, 10, 4, 4); // Right eye
+            ctx.fillStyle = '#FFFFFF'; // Eye sparkle
+            ctx.fillRect(13, 11, 1, 1);
+            ctx.fillRect(25, 11, 1, 1);
+
+            // Mouth (Dark shadow)
+            ctx.fillStyle = '#4B3621';
+            ctx.fillRect(18, 18, 4, 2);
+
+            // Totem "Arms" (Minecraft style but stylized)
+            ctx.fillStyle = '#B8860B'; // Dark gold
+            ctx.fillRect(0, 15, 10, 15); // Left arm
+            ctx.fillRect(30, 15, 10, 15); // Right arm
+            ctx.fillStyle = '#FFD700'; // Gold
+            ctx.fillRect(2, 17, 6, 11);
+            ctx.fillRect(32, 17, 6, 11);
+
+            // Emerald gems in arms (Intricate detail)
+            ctx.fillStyle = '#00FF00';
+            ctx.fillRect(3, 20, 4, 4);
+            ctx.fillRect(33, 20, 4, 4);
+
+            totemCanvas.refresh();
+        }
+
         // ===== LEVEL SETUP =====
         // Fixed screen - no camera movement
         this.baseWidth = 1280;
@@ -130,27 +231,23 @@ export class Start extends Phaser.Scene {
         // ===== VINES (Climbable) =====
         this.vines = [];
         // Left vine (goes from ground to top) - moved further away from center
-        const leftVine = this.add.rectangle(50, 240, 20, 400, 0x228B22);
-        leftVine.setOrigin(0.5, 0.5);
-        this.physics.add.existing(leftVine, true);
+        const leftVine = this.add.tileSprite(50, 400, 32, 360, 'vine-pixel');
+        leftVine.setOrigin(0.5, 1); // Anchor to ground top
         this.vines.push(leftVine);
         
         // Right vine (goes from ground to top) - moved further away from center
-        const rightVine = this.add.rectangle(1230, 240, 20, 400, 0x228B22);
-        rightVine.setOrigin(0.5, 0.5);
-        this.physics.add.existing(rightVine, true);
+        const rightVine = this.add.tileSprite(1230, 400, 32, 360, 'vine-pixel');
+        rightVine.setOrigin(0.5, 1); // Anchor to ground top
         this.vines.push(rightVine);
         
-        // Center-left vine (from middle platform to top) - decreased length
-        const centerLeftVine = this.add.rectangle(350, 160, 20, 120, 0x228B22);
-        centerLeftVine.setOrigin(0.5, 0.5);
-        this.physics.add.existing(centerLeftVine, true);
+        // Center-left vine (attached to platform underneath)
+        const centerLeftVine = this.add.tileSprite(350, 257.5, 32, 150, 'vine-pixel');
+        centerLeftVine.setOrigin(0.5, 1); // Anchor to platform top
         this.vines.push(centerLeftVine);
         
-        // Center-right vine (from middle platform to top) - decreased length
-        const centerRightVine = this.add.rectangle(930, 160, 20, 120, 0x228B22);
-        centerRightVine.setOrigin(0.5, 0.5);
-        this.physics.add.existing(centerRightVine, true);
+        // Center-right vine (attached to platform underneath)
+        const centerRightVine = this.add.tileSprite(930, 257.5, 32, 150, 'vine-pixel');
+        centerRightVine.setOrigin(0.5, 1); // Anchor to platform top
         this.vines.push(centerRightVine);
         
         // Platforms at top of side vines for runes (require W+D or Up+Right to reach)
@@ -297,6 +394,10 @@ export class Start extends Phaser.Scene {
         
         // ===== INFLUENCE SYSTEM =====
         this.influenceRate = 0; // Net influence per second
+        
+        // Start Level 5 Countdown
+        this.playersFrozen = true;
+        this.startCountdown();
     }
 
     updateViewport() {
@@ -536,7 +637,7 @@ export class Start extends Phaser.Scene {
         
         // Decorative vines on the wall
         for (let i = 0; i < 3; i++) {
-            const vine = this.add.rectangle(-40 + i * 40, 0, 8, 40, 0x1a5f1a);
+            const vine = this.add.tileSprite(-40 + i * 40, 0, 16, 40, 'vine-pixel');
             vine.setOrigin(0.5, 0.5);
             this.vineFlowIndicator.add(vine);
         }
@@ -705,19 +806,10 @@ export class Start extends Phaser.Scene {
     }
 
     createWindTotemDial() {
-        // Create Wind Totem (Minecraft Totem of Undying style) - moved down a bit but still above middle pillar
-        // Main totem body - rectangular with face
-        this.windTotem = this.add.rectangle(640, 55, 40, 50, 0x8B7355); // Brown/tan color
+        // Create Wind Totem (Pixel Art Sprite)
+        // Platform top is at 55 (70 - 15), totem is 50px high, so y=30 puts it on top
+        this.windTotem = this.add.sprite(640, 30, 'totem-pixel');
         this.windTotem.setOrigin(0.5, 0.5);
-        this.windTotem.setStrokeStyle(2, 0x654321);
-        
-        // Totem face details
-        const faceY = 50;
-        // Eyes
-        this.add.circle(630, faceY, 3, 0x000000);
-        this.add.circle(650, faceY, 3, 0x000000);
-        // Mouth
-        this.add.rectangle(640, faceY + 8, 10, 2, 0x000000);
         
         // Totem state
         this.windTotem.active = false;
@@ -858,26 +950,19 @@ export class Start extends Phaser.Scene {
         keyDownText.setVisible(false);
         keyRightText.setVisible(false);
         
-        // === Totem of Undying–style figure on the TV (centered) ===
+        // === Totem of Undying–style figure on the TV (Centered Pixel Art) ===
         const totem = this.add.container(0, 0);
         
-        // Main body
-        const body = this.add.rectangle(0, 0, 60, 90, 0x8B7355);
-        body.setStrokeStyle(2, 0x654321);
+        // Use the new pixel art sprite for the TV totem
+        const totemSprite = this.add.sprite(0, 0, 'totem-pixel');
+        totemSprite.setScale(1.5); // Make it slightly larger for the TV
         
-        // Arms
-        const leftArm = this.add.rectangle(-45, 5, 25, 55, 0x8B7355);
-        leftArm.setStrokeStyle(2, 0x654321);
-        const rightArm = this.add.rectangle(45, 5, 25, 55, 0x8B7355);
-        rightArm.setStrokeStyle(2, 0x654321);
-        
-        // Face (eyes + mouth)
+        // Face (eyes) - we add these ON TOP of the sprite so they can change color during minigame
         const eyeColor = playerColor;
-        const eyeLeft = this.add.rectangle(-12, -15, 8, 8, eyeColor);
-        const eyeRight = this.add.rectangle(12, -15, 8, 8, eyeColor);
-        const mouth = this.add.rectangle(0, 10, 18, 4, 0x000000);
+        const eyeLeft = this.add.rectangle(-9, -19, 6, 6, eyeColor);
+        const eyeRight = this.add.rectangle(9, -19, 6, 6, eyeColor);
         
-        totem.add([body, leftArm, rightArm, eyeLeft, eyeRight, mouth]);
+        totem.add([totemSprite, eyeLeft, eyeRight]);
         container.add(totem);
         
         return {
@@ -933,8 +1018,6 @@ export class Start extends Phaser.Scene {
                 right: 0
             }
         };
-        this.playersFrozen = true;
-        this.startCountdown();
     }
 
     startCountdown() {
@@ -948,32 +1031,32 @@ export class Start extends Phaser.Scene {
             }
 
             const value = countdownValues[currentIndex];
-            // CENTER OF DESIGN SPACE (1280x720)
-            // This is the most reliable way to position it in Level 1
-            const centerX = 640;
-            const centerY = 360;
+            
+            // Center of the ACTUAL screen (browser window)
+            const centerX = this.scale.width / 2;
+            const centerY = this.scale.height / 2;
 
             const text = this.add.text(centerX, centerY, value, {
-                fontSize: '180px',
+                fontSize: '120px', // Uniform size for numbers and GO!
                 fill: '#ffff00',
                 fontStyle: 'bold',
                 stroke: '#000000',
                 strokeThickness: 12,
                 resolution: 2
-            }).setOrigin(0.5).setScale(0).setDepth(30000); // Remove setScrollFactor(0) for world-centering consistency
+            }).setOrigin(0.5).setScale(0).setDepth(100000).setScrollFactor(0);
 
             // Level 5 Danger Animation: Scale from 0 to massive, then fade
             this.tweens.add({
                 targets: text,
-                scale: 4,
-                alpha: { from: 1, to: 0.5 },
+                scale: 2.5, // Uniform scale for numbers and GO!
+                alpha: 1, // Fully opaque yellow
                 duration: 800,
                 ease: 'Back.easeOut',
                 onComplete: () => {
                     this.tweens.add({
                         targets: text,
                         alpha: 0,
-                        scale: 6,
+                        scale: 3.5,
                         duration: 200,
                         onComplete: () => {
                             text.destroy();
@@ -1091,8 +1174,8 @@ export class Start extends Phaser.Scene {
         // If latched to vine
         if (this.player1.latchedToVine && this.player1.onVine) {
             const vine = this.player1.onVine;
-            const vineTop = vine.y - vine.height / 2;
-            const vineBottom = vine.y + vine.height / 2;
+            const vineTop = vine.getTopCenter().y;
+            const vineBottom = vine.getBottomCenter().y;
             const playerHalfHeight = 25;
             
             // Keep player aligned to vine horizontally
@@ -1223,8 +1306,8 @@ export class Start extends Phaser.Scene {
         // If latched to vine
         if (this.player2.latchedToVine && this.player2.onVine) {
             const vine = this.player2.onVine;
-            const vineTop = vine.y - vine.height / 2;
-            const vineBottom = vine.y + vine.height / 2;
+            const vineTop = vine.getTopCenter().y;
+            const vineBottom = vine.getBottomCenter().y;
             const playerHalfHeight = 25;
             
             // Keep player aligned to vine horizontally
@@ -1343,8 +1426,8 @@ export class Start extends Phaser.Scene {
         this.vines.forEach(vine => {
             const dist = Math.abs(player.x - vine.x); // Horizontal distance only
             // Check if player is within vine's vertical bounds
-            const vineTop = vine.y - vine.height / 2;
-            const vineBottom = vine.y + vine.height / 2;
+            const vineTop = vine.getTopCenter().y;
+            const vineBottom = vine.getBottomCenter().y;
             const withinVineBounds = player.y >= vineTop - 30 && player.y <= vineBottom + 30;
             
             // Check if close enough horizontally (within 50 pixels)
@@ -1785,7 +1868,7 @@ export class Start extends Phaser.Scene {
                 }
                 // Reset totem color if no longer owned
                 if (!totem.owner) {
-                    totem.setFillStyle(0x8B7355);
+                    totem.clearTint();
                 }
             }
         } else if (totem.cooldownText) {
@@ -2342,7 +2425,7 @@ export class Start extends Phaser.Scene {
             
             // Visual feedback - totem glows with player color
             const glowColor = game.playerFaction === 'Solari' ? 0xFFD700 : 0x8B00FF;
-            this.windTotem.setFillStyle(glowColor);
+            this.windTotem.setTint(glowColor);
         } else {
             // Player failed - no rewards, but can try again after short cooldown
             this.windTotem.cooldownActive = true;
