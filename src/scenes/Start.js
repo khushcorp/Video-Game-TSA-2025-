@@ -11,18 +11,29 @@ export class Start extends Phaser.Scene {
     create() {
         // ===== LEVEL SETUP =====
         // Fixed screen - no camera movement
-        this.cameras.main.setBounds(0, 0, 1280, 720);
+        this.baseWidth = 1280;
+        this.baseHeight = 720;
+        this.updateViewport();
+        this.scale.on('resize', this.updateViewport, this);
         
         // ===== BACKGROUND =====
+        // Fullscreen backdrop so the canvas is always filled
+        this.fullscreenBg = this.add.rectangle(0, 0, this.scale.width, this.scale.height, 0x2d5016);
+        this.fullscreenBg.setOrigin(0, 0);
+        this.fullscreenBg.setScrollFactor(0);
+        this.fullscreenBg.setDepth(-1000);
+
+        // Store background elements for dynamic resizing
+        this.bgRects = [];
         // Compress game area - main game takes up top 500px, bottom 220px for TV screens
         // Jungle/forest background - dark green with some texture
-        this.add.rectangle(640, 250, 1280, 500, 0x2d5016); // Dark green background (compressed)
+        this.bgRects.push(this.add.rectangle(640, 250, 1280, 500, 0x2d5016)); // Dark green background
         // Add some variation
-        this.add.rectangle(640, 125, 1280, 100, 0x3d6b1f); // Lighter green for sky area
-        this.add.rectangle(640, 400, 1280, 200, 0x1a3d0a); // Darker green for ground area
+        this.bgRects.push(this.add.rectangle(640, 125, 1280, 100, 0x3d6b1f)); // Lighter green sky
+        this.bgRects.push(this.add.rectangle(640, 400, 1280, 200, 0x1a3d0a)); // Darker green ground
         
-        // TV Screen area at bottom (bigger area)
-        this.add.rectangle(640, 610, 1280, 220, 0x1a1a1a); // Dark background for TV area
+        // TV Screen area at bottom
+        this.bgRects.push(this.add.rectangle(640, 610, 1280, 220, 0x1a1a1a)); // Dark background for TV area
         
         // ===== INFLUENCE BARS UI =====
         this.player1Influence = 0; // Solari influence (0 to 500)
@@ -34,16 +45,16 @@ export class Start extends Phaser.Scene {
         this.player1BarBg.setOrigin(0.5, 0.5);
         this.player1BarFill = this.add.rectangle(120, 30, 0, 25, 0xFFD700); // Gold
         this.player1BarFill.setOrigin(0, 0.5);
-        this.player1InfluenceText = this.add.text(320, 55, '0/500', { fontSize: '14px', fill: '#ffffff' }).setOrigin(0.5, 0.5);
-        this.player1NameText = this.add.text(320, 75, 'SOLARI', { fontSize: '18px', fill: '#FFD700', fontStyle: 'bold' }).setOrigin(0.5, 0.5);
+        this.player1InfluenceText = this.add.text(320, 55, '0/500', { fontSize: '14px', fill: '#ffffff', resolution: 2 }).setOrigin(0.5, 0.5).setDepth(10000);
+        this.player1NameText = this.add.text(320, 75, 'SOLARI', { fontSize: '18px', fill: '#FFD700', fontStyle: 'bold', resolution: 2 }).setOrigin(0.5, 0.5).setDepth(10000);
         
         // Player 2 (Umbrae) influence bar
         this.player2BarBg = this.add.rectangle(960, 30, 400, 30, 0x333333);
         this.player2BarBg.setOrigin(0.5, 0.5);
         this.player2BarFill = this.add.rectangle(760, 30, 0, 25, 0x8B00FF); // Purple
         this.player2BarFill.setOrigin(0, 0.5);
-        this.player2InfluenceText = this.add.text(960, 55, '0/500', { fontSize: '14px', fill: '#ffffff' }).setOrigin(0.5, 0.5);
-        this.player2NameText = this.add.text(960, 75, 'UMBRAE', { fontSize: '18px', fill: '#8B00FF', fontStyle: 'bold' }).setOrigin(0.5, 0.5);
+        this.player2InfluenceText = this.add.text(960, 55, '0/500', { fontSize: '14px', fill: '#ffffff', resolution: 2 }).setOrigin(0.5, 0.5).setDepth(10000);
+        this.player2NameText = this.add.text(960, 75, 'UMBRAE', { fontSize: '18px', fill: '#8B00FF', fontStyle: 'bold', resolution: 2 }).setOrigin(0.5, 0.5).setDepth(10000);
         
         // ===== INFLUENCE MAP BLOCKS =====
         // Visual "territory" blocks on the map that reflect how many points of influence
@@ -54,10 +65,10 @@ export class Start extends Phaser.Scene {
         this.platforms = [];
         
         // Ground level platform (main floor) - compressed to fit above TV area
-        const ground = this.add.rectangle(640, 440, 1280, 80, 0x8B4513);
-        ground.setOrigin(0.5, 0.5);
-        this.physics.add.existing(ground, true);
-        this.platforms.push(ground);
+        this.ground = this.add.rectangle(640, 440, 1280, 80, 0x8B4513);
+        this.ground.setOrigin(0.5, 0.5);
+        this.physics.add.existing(this.ground, true);
+        this.platforms.push(this.ground);
         
         // Middle platform (for Vine Pattern Wall) - moved down a bit but still above middle pillar
         const middlePlatform = this.add.rectangle(640, 250, 400, 30, 0x654321);
@@ -172,25 +183,29 @@ export class Start extends Phaser.Scene {
         this.platforms.push(rightVineGroundPlatform);
         
         // ===== TV SCREENS =====
+        this.tvElementsP1 = [];
+        this.tvElementsP2 = [];
         // Player 1 TV (left side) - resized so the Simon grid fits fully inside
         this.tvP1 = this.add.rectangle(320, 600, 500, 220, 0x000000);
         this.tvP1.setOrigin(0.5, 0.5);
         this.tvP1.setStrokeStyle(4, 0xFFD700);
         this.tvP1.setDepth(10);
+        this.tvElementsP1.push(this.tvP1);
         
         // TV frame for Player 1
-        this.add.rectangle(320, 600, 480, 200, 0x1a1a1a).setDepth(11);
-        this.add.text(320, 530, 'SOLARI TV', { fontSize: '16px', fill: '#FFD700', fontStyle: 'bold' }).setOrigin(0.5, 0.5).setDepth(12);
+        this.tvElementsP1.push(this.add.rectangle(320, 600, 480, 200, 0x1a1a1a).setDepth(11));
+        this.tvElementsP1.push(this.add.text(320, 530, 'SOLARI TV', { fontSize: '16px', fill: '#FFD700', fontStyle: 'bold', resolution: 2 }).setOrigin(0.5, 0.5).setDepth(12));
         
         // Player 2 TV (right side) - resized so the Simon grid fits fully inside
         this.tvP2 = this.add.rectangle(960, 600, 500, 220, 0x000000);
         this.tvP2.setOrigin(0.5, 0.5);
         this.tvP2.setStrokeStyle(4, 0x8B00FF);
         this.tvP2.setDepth(10);
+        this.tvElementsP2.push(this.tvP2);
         
         // TV frame for Player 2
-        this.add.rectangle(960, 600, 480, 200, 0x1a1a1a).setDepth(11);
-        this.add.text(960, 530, 'UMBRAE TV', { fontSize: '16px', fill: '#8B00FF', fontStyle: 'bold' }).setOrigin(0.5, 0.5).setDepth(12);
+        this.tvElementsP2.push(this.add.rectangle(960, 600, 480, 200, 0x1a1a1a).setDepth(11));
+        this.tvElementsP2.push(this.add.text(960, 530, 'UMBRAE TV', { fontSize: '16px', fill: '#8B00FF', fontStyle: 'bold', resolution: 2 }).setOrigin(0.5, 0.5).setDepth(12));
         
         
         // ===== PLAYERS =====
@@ -278,10 +293,104 @@ export class Start extends Phaser.Scene {
         this.levelTime = 0;
         this.levelDuration = 300; // 5 minutes in seconds
         // Timer moved to center middle area
-        this.timeText = this.add.text(640, 110, '5:00', { fontSize: '24px', fill: '#ffffff' }).setOrigin(0.5, 0.5);
+        this.timeText = this.add.text(640, 110, '5:00', { fontSize: '24px', fill: '#ffffff', resolution: 2 }).setOrigin(0.5, 0.5).setDepth(10000);
         
         // ===== INFLUENCE SYSTEM =====
         this.influenceRate = 0; // Net influence per second
+    }
+
+    updateViewport() {
+        const width = this.scale.width;
+        const height = this.scale.height;
+        // STAY ZOOMED OUT: Use Math.min to ensure the 1280x720 area is fully visible
+        const zoom = Math.min(width / this.baseWidth, height / this.baseHeight);
+        
+        this.cameras.main.setZoom(zoom);
+        this.cameras.main.centerOn(this.baseWidth / 2, this.baseHeight / 2);
+
+        // Calculate visible world dimensions using limits
+        const worldWidthNeeded = width / zoom;
+        const worldHeightNeeded = height / zoom;
+        
+        if (this.bgRects) {
+            const worldWidthNeeded = width / zoom;
+            const worldHeightNeeded = height / zoom;
+            const leftEdge = (this.baseWidth - worldWidthNeeded) / 2;
+            const rightEdge = (this.baseWidth + worldWidthNeeded) / 2;
+
+            // Reposition UI to edges
+            const uiPadding = 320;
+            if (this.player1BarBg) {
+                const p1X = leftEdge + uiPadding;
+                this.player1BarBg.x = p1X;
+                this.player1BarFill.x = p1X - 200;
+                this.player1InfluenceText.x = p1X;
+                this.player1NameText.x = p1X;
+            }
+            if (this.player2BarBg) {
+                const p2X = rightEdge - uiPadding;
+                this.player2BarBg.x = p2X;
+                this.player2BarFill.x = p2X - 200;
+                this.player2InfluenceText.x = p2X;
+                this.player2NameText.x = p2X;
+            }
+
+            // Reposition TVs to edges
+            const tvPadding = 320;
+            if (this.tvElementsP1) {
+                const p1X = leftEdge + tvPadding;
+                this.tvElementsP1.forEach(el => el.x = p1X);
+            }
+            if (this.tvElementsP2) {
+                const p2X = rightEdge - tvPadding;
+                this.tvElementsP2.forEach(el => el.x = p2X);
+            }
+
+            // Reposition mini-games
+            if (this.simonSaysContainerP1) {
+                this.simonSaysContainerP1.x = leftEdge + tvPadding;
+            }
+            if (this.simonSaysContainerP2) {
+                this.simonSaysContainerP2.x = rightEdge - tvPadding;
+            }
+            if (this.lightsOutP1 && this.lightsOutP1.container) {
+                this.lightsOutP1.container.x = leftEdge + tvPadding;
+            }
+            if (this.lightsOutP2 && this.lightsOutP2.container) {
+                this.lightsOutP2.container.x = rightEdge - tvPadding;
+            }
+
+            // All background rectangles span full width
+            this.bgRects.forEach(rect => {
+                rect.width = worldWidthNeeded;
+                rect.x = this.baseWidth / 2;
+            });
+
+            // The ground also spans full width
+            if (this.ground) {
+                this.ground.width = worldWidthNeeded;
+                this.ground.x = this.baseWidth / 2;
+                // Update physics body size
+                if (this.ground.body) {
+                    this.ground.body.setSize(worldWidthNeeded, 80);
+                }
+            }
+
+            // The TV area (last in bgRects) needs to extend to the bottom
+            const tvBg = this.bgRects[3];
+            const bottomDiff = (worldHeightNeeded - this.baseHeight) / 2;
+            if (bottomDiff > 0) {
+                tvBg.height = 220 + bottomDiff * 2;
+                tvBg.y = 610 + bottomDiff;
+            } else {
+                tvBg.height = 220;
+                tvBg.y = 610;
+            }
+        }
+
+        if (this.fullscreenBg) {
+            this.fullscreenBg.setSize(width, height);
+        }
     }
 
     createForestRunes() {
@@ -358,8 +467,9 @@ export class Start extends Phaser.Scene {
             fill: '#ffff00',
             fontStyle: 'bold',
             stroke: '#000000',
-            strokeThickness: 3
-        }).setOrigin(0.5, 0.5);
+            strokeThickness: 3,
+            resolution: 2
+        }).setOrigin(0.5, 0.5).setDepth(10000);
         this.middleRuneTimerText.setDepth(100); // Make sure it's visible
         
         // List of reachable platform positions for random middle rune spawn
@@ -454,9 +564,10 @@ export class Start extends Phaser.Scene {
             {
                 fontSize: '20px',
                 fill: '#ff0000',
-                fontStyle: 'bold'
+                fontStyle: 'bold',
+                resolution: 2
             }
-        ).setOrigin(0.5, 1);
+        ).setOrigin(0.5, 1).setDepth(10000);
         this.vineFlowIndicator.cooldownText.setVisible(false);
         
         // Lights Out games for each player on TV screens
@@ -489,12 +600,12 @@ export class Start extends Phaser.Scene {
         // Create container for the TV screen
         const container = this.add.container(centerX, centerY);
         container.setVisible(false);
-        container.setDepth(20);
+        container.setDepth(10000);
         container.setAlpha(0);
         game.container = container;
         
         const gameSize = 200; // Fits better in TV screen
-        const numVines = 7;
+        const numVines = 6;
         const vineSpacing = gameSize / (numVines + 1);
         const vineSize = 22; // Slightly smaller to fit better
         
@@ -532,17 +643,19 @@ export class Start extends Phaser.Scene {
         
         // Key hint (showing which keys to use) - above vines
         const keyHint = playerFaction === 'Solari' 
-            ? this.add.text(0, -70, 'Keys: 1 2 3 4 5 6 7', {
+            ? this.add.text(0, -70, 'Keys: 1 2 3 4 5 6', {
                 fontSize: '14px',
                 fill: '#ffffff',
                 align: 'center',
-                fontStyle: 'bold'
+                fontStyle: 'bold',
+                resolution: 2
             })
-            : this.add.text(0, -70, 'Keys: 4 5 6 7 8 9 0', {
+            : this.add.text(0, -70, 'Keys: 5 6 7 8 9 0', {
                 fontSize: '14px',
                 fill: '#ffffff',
                 align: 'center',
-                fontStyle: 'bold'
+                fontStyle: 'bold',
+                resolution: 2
             });
         keyHint.setOrigin(0.5, 0.5);
         container.add(keyHint);
@@ -552,7 +665,8 @@ export class Start extends Phaser.Scene {
         const timerText = this.add.text(0, 5, '15', {
             fontSize: '16px',
             fill: '#ffff00',
-            fontStyle: 'bold'
+            fontStyle: 'bold',
+            resolution: 2
         }).setOrigin(0.5, 0.5);
         timerText.setVisible(false); // Hide until minigame actually starts
         container.add(timerText);
@@ -562,12 +676,13 @@ export class Start extends Phaser.Scene {
         const goalText = playerFaction === 'Solari' 
             ? 'Light ALL vines ON (Sun rewards you!)' 
             : 'Light ALL vines ON (Darkness rewards you!)';
-        const keyText = playerFaction === 'Solari' ? '1-7' : '4-0';
+        const keyText = playerFaction === 'Solari' ? '1-6' : '5-0';
         const instructionText = this.add.text(0, 50, `HOW TO PLAY:\nPress keys ${keyText} to toggle vines.\nEach press affects that vine and its neighbors.\n${goalText}`, {
             fontSize: '10px',
             fill: '#ffffff',
             align: 'center',
-            wordWrap: { width: gameSize - 10 }
+            wordWrap: { width: gameSize - 10 },
+            resolution: 2
         }).setOrigin(0.5, 0.5);
         container.add(instructionText);
         game.instructionText = instructionText;
@@ -579,10 +694,11 @@ export class Start extends Phaser.Scene {
             fill: '#ffff00',
             fontStyle: 'bold',
             stroke: '#000000',
-            strokeThickness: 2
+            strokeThickness: 2,
+            resolution: 2
         }).setOrigin(0.5, 0.5);
         statusText.setVisible(false); // Start hidden, show when needed
-        statusText.setDepth(200); // Make sure it's on top of everything
+        statusText.setDepth(10001); // Make sure it's on top of everything
         game.statusText = statusText;
         
         return game;
@@ -616,9 +732,10 @@ export class Start extends Phaser.Scene {
             {
                 fontSize: '20px',
                 fill: '#ff0000',
-                fontStyle: 'bold'
+                fontStyle: 'bold',
+                resolution: 2
             }
-        ).setOrigin(0.5, 1);
+        ).setOrigin(0.5, 1).setDepth(10000);
         this.windTotem.cooldownText.setVisible(false);
         
         // Simon Says games for each player on TV screens (aligned with TV centers)
@@ -675,8 +792,15 @@ export class Start extends Phaser.Scene {
         // Game elements container (for smooth animation)
         const container = this.add.container(centerX, centerY);
         container.setVisible(false);
-        container.setDepth(20);
+        container.setDepth(10000);
         container.setAlpha(0); // Start invisible for fade-in
+        
+        // Store reference for repositioning
+        if (playerFaction === 'Solari') {
+            this.simonSaysContainerP1 = container;
+        } else {
+            this.simonSaysContainerP2 = container;
+        }
         
         // Background (TV screen content)
         const bg = this.add.rectangle(0, 0, gameSize, gameSize, baseColor);
@@ -687,22 +811,25 @@ export class Start extends Phaser.Scene {
         const title = this.add.text(0, -gameSize/2 - 15, '', {
             fontSize: '18px',
             fill: '#ffffff',
-            fontStyle: 'bold'
+            fontStyle: 'bold',
+            resolution: 2
         }).setOrigin(0.5, 0.5);
         container.add(title);
         
         // Instruction text (outside the container, ABOVE the TV so it's never cut off or hidden)
         const instructionText = this.add.text(centerX, centerY - gameSize/2 - 35, '', {
             fontSize: '14px',
-            fill: '#ffffff'
+            fill: '#ffffff',
+            resolution: 2
         }).setOrigin(0.5, 0.5);
-        instructionText.setDepth(25); // above everything in the TV area
+        instructionText.setDepth(10001); // above everything in the TV area
         
         // Round text ("Round X/N") just below the play area
         const timerText = this.add.text(0, gameSize/2 + 5, 'Round 1/5', {
             fontSize: '20px',
             fill: '#ffff00',
-            fontStyle: 'bold'
+            fontStyle: 'bold',
+            resolution: 2
         }).setOrigin(0.5, 0.5);
         container.add(timerText);
         
@@ -715,17 +842,17 @@ export class Start extends Phaser.Scene {
         const leftLabel = isSolari ? 'A' : '←';
         const downLabel = isSolari ? 'S' : '↓';
         const rightLabel = isSolari ? 'D' : '→';
-        const keyStyle = { fontSize: '16px', fill: '#ffffff' };
+        const keyStyle = { fontSize: '16px', fill: '#ffffff', resolution: 2 };
         
         const keyRowY = centerY - gameSize/2 - 10;
         const keyUpText = this.add.text(centerX - 60, keyRowY, upLabel, keyStyle).setOrigin(0.5, 0.5);
         const keyLeftText = this.add.text(centerX - 20, keyRowY, leftLabel, keyStyle).setOrigin(0.5, 0.5);
         const keyDownText = this.add.text(centerX + 20, keyRowY, downLabel, keyStyle).setOrigin(0.5, 0.5);
         const keyRightText = this.add.text(centerX + 60, keyRowY, rightLabel, keyStyle).setOrigin(0.5, 0.5);
-        keyUpText.setDepth(25);
-        keyLeftText.setDepth(25);
-        keyDownText.setDepth(25);
-        keyRightText.setDepth(25);
+        keyUpText.setDepth(10001);
+        keyLeftText.setDepth(10001);
+        keyDownText.setDepth(10001);
+        keyRightText.setDepth(10001);
         keyUpText.setVisible(false);
         keyLeftText.setVisible(false);
         keyDownText.setVisible(false);
@@ -806,9 +933,68 @@ export class Start extends Phaser.Scene {
                 right: 0
             }
         };
+        this.playersFrozen = true;
+        this.startCountdown();
+    }
+
+    startCountdown() {
+        const countdownValues = ['3', '2', '1', 'GO!'];
+        let currentIndex = 0;
+
+        const showNext = () => {
+            if (currentIndex >= countdownValues.length) {
+                this.playersFrozen = false;
+                return;
+            }
+
+            const value = countdownValues[currentIndex];
+            // CENTER OF DESIGN SPACE (1280x720)
+            // This is the most reliable way to position it in Level 1
+            const centerX = 640;
+            const centerY = 360;
+
+            const text = this.add.text(centerX, centerY, value, {
+                fontSize: '180px',
+                fill: '#ffff00',
+                fontStyle: 'bold',
+                stroke: '#000000',
+                strokeThickness: 12,
+                resolution: 2
+            }).setOrigin(0.5).setScale(0).setDepth(30000); // Remove setScrollFactor(0) for world-centering consistency
+
+            // Level 5 Danger Animation: Scale from 0 to massive, then fade
+            this.tweens.add({
+                targets: text,
+                scale: 4,
+                alpha: { from: 1, to: 0.5 },
+                duration: 800,
+                ease: 'Back.easeOut',
+                onComplete: () => {
+                    this.tweens.add({
+                        targets: text,
+                        alpha: 0,
+                        scale: 6,
+                        duration: 200,
+                        onComplete: () => {
+                            text.destroy();
+                            currentIndex++;
+                            showNext();
+                        }
+                    });
+                }
+            });
+        };
+
+        showNext();
     }
 
     update() {
+        if (this.playersFrozen) {
+            // Stop movement during countdown
+            if (this.player1 && this.player1.body) this.player1.body.setVelocity(0, 0);
+            if (this.player2 && this.player2.body) this.player2.body.setVelocity(0, 0);
+            return;
+        }
         // Update timer
         this.levelTime += 1/60; // Assuming 60 FPS
         const remaining = Math.max(0, this.levelDuration - this.levelTime);
@@ -1184,8 +1370,8 @@ export class Start extends Phaser.Scene {
                 
                 // Key text (W for player1, Up Arrow symbol for player2)
                 const keyText = player.faction === 'Solari' 
-                    ? this.add.text(0, 0, 'W', { fontSize: '24px', fill: '#000000', fontStyle: 'bold' })
-                    : this.add.text(0, -2, '↑', { fontSize: '24px', fill: '#000000', fontStyle: 'bold' });
+                    ? this.add.text(0, 0, 'W', { fontSize: '24px', fill: '#000000', fontStyle: 'bold', resolution: 2 })
+                    : this.add.text(0, -2, '↑', { fontSize: '24px', fill: '#000000', fontStyle: 'bold', resolution: 2 });
                 keyText.setOrigin(0.5, 0.5);
                 
                 indicatorGroup.add([circle, keyText]);
@@ -1434,8 +1620,8 @@ export class Start extends Phaser.Scene {
                     const circle = this.add.circle(0, 0, 25, 0xffffff, 0.9);
                     circle.setStrokeStyle(3, 0x000000);
                     const keyText = player.faction === 'Solari'
-                        ? this.add.text(0, 0, 'W', { fontSize: '24px', fill: '#000000', fontStyle: 'bold' })
-                        : this.add.text(0, -2, '↑', { fontSize: '24px', fill: '#000000', fontStyle: 'bold' });
+                        ? this.add.text(0, 0, 'W', { fontSize: '24px', fill: '#000000', fontStyle: 'bold', resolution: 2 })
+                        : this.add.text(0, -2, '↑', { fontSize: '24px', fill: '#000000', fontStyle: 'bold', resolution: 2 });
                     keyText.setOrigin(0.5, 0.5);
                     indicatorGroup.add([circle, keyText]);
                     player.vineFlowIndicator = indicatorGroup;
@@ -1543,8 +1729,8 @@ export class Start extends Phaser.Scene {
                     const circle = this.add.circle(0, 0, 25, 0xffffff, 0.9);
                     circle.setStrokeStyle(3, 0x000000);
                     const keyText = player.faction === 'Solari'
-                        ? this.add.text(0, 0, 'W', { fontSize: '24px', fill: '#000000', fontStyle: 'bold' })
-                        : this.add.text(0, -2, '↑', { fontSize: '24px', fill: '#000000', fontStyle: 'bold' });
+                        ? this.add.text(0, 0, 'W', { fontSize: '24px', fill: '#000000', fontStyle: 'bold', resolution: 2 })
+                        : this.add.text(0, -2, '↑', { fontSize: '24px', fill: '#000000', fontStyle: 'bold', resolution: 2 });
                     keyText.setOrigin(0.5, 0.5);
                     indicatorGroup.add([circle, keyText]);
                     player.totemIndicator = indicatorGroup;
@@ -2252,11 +2438,12 @@ export class Start extends Phaser.Scene {
     }
     
     updateLightsOutVisuals(game) {
-        const numVines = 7;
+        const numVines = game.vines.length;
         const opponentOwns = game.currentOwner && game.currentOwner !== game.playerFaction;
         
         for (let i = 0; i < numVines; i++) {
             const vine = game.vines[i];
+            if (!vine) continue;
             const isOn = game.vineState[i];
             vine.isOn = isOn;
             
@@ -2279,7 +2466,7 @@ export class Start extends Phaser.Scene {
     }
     
     toggleLightsOutVine(game, index) {
-        const numVines = 7;
+        const numVines = game.vines.length;
         
         // Toggle the pressed vine and its neighbors
         // Vine 0: toggles 0, 1
@@ -2390,7 +2577,7 @@ export class Start extends Phaser.Scene {
     }
     
     checkLightsOutComplete(game) {
-        const numVines = 7;
+        const numVines = game.vines.length;
         
         // Check if all vines are ON and in player's color
         // All must be ON (true) AND toggled by player (showing player color, not opponent color)
@@ -2453,7 +2640,7 @@ export class Start extends Phaser.Scene {
             const goalText = game.playerFaction === 'Solari' 
                 ? 'Light ALL vines ON (Sun rewards you!)' 
                 : 'Light ALL vines ON (Darkness rewards you!)';
-            const keyHint = game.playerFaction === 'Solari' ? '1-7' : '4-0';
+            const keyHint = game.playerFaction === 'Solari' ? '1-6' : '5-0';
             game.instructionText.setText(
                 `HOW TO PLAY:\nPress keys ${keyHint} to toggle vines.\nEach press affects that vine and its neighbors.\n${goalText}`
             );
@@ -2504,21 +2691,19 @@ export class Start extends Phaser.Scene {
             // Initialize number keys if not already done
             if (!game.numKeys) {
                 if (game.playerFaction === 'Solari') {
-                    // Player 1: Keys 1-7
+                    // Player 1: Keys 1-6
                     game.numKeys = {
                         '1': this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ONE),
                         '2': this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.TWO),
                         '3': this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.THREE),
                         '4': this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.FOUR),
                         '5': this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.FIVE),
-                        '6': this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SIX),
-                        '7': this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SEVEN)
+                        '6': this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SIX)
                     };
-                    game.keyMap = { '1': 0, '2': 1, '3': 2, '4': 3, '5': 4, '6': 5, '7': 6 };
+                    game.keyMap = { '1': 0, '2': 1, '3': 2, '4': 3, '5': 4, '6': 5 };
                 } else {
-                    // Player 2: Keys 4-0 (4, 5, 6, 7, 8, 9, 0)
+                    // Player 2: Keys 5-0 (5, 6, 7, 8, 9, 0)
                     game.numKeys = {
-                        '4': this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.FOUR),
                         '5': this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.FIVE),
                         '6': this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SIX),
                         '7': this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SEVEN),
@@ -2526,7 +2711,7 @@ export class Start extends Phaser.Scene {
                         '9': this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.NINE),
                         '0': this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ZERO)
                     };
-                    game.keyMap = { '4': 0, '5': 1, '6': 2, '7': 3, '8': 4, '9': 5, '0': 6 };
+                    game.keyMap = { '5': 0, '6': 1, '7': 2, '8': 3, '9': 4, '0': 5 };
                 }
             }
             
@@ -2731,20 +2916,22 @@ export class Start extends Phaser.Scene {
             winnerText = this.add.text(640, 300, `${winner} WINS!`, { 
                 fontSize: '48px', 
                 fill: winner === 'Solari' ? '#FFD700' : '#8B00FF',
-                fontStyle: 'bold'
-            }).setOrigin(0.5, 0.5);
+                fontStyle: 'bold',
+                resolution: 2
+            }).setOrigin(0.5, 0.5).setDepth(10000);
         } else {
             winnerText = this.add.text(640, 300, 'NO RESULT', { 
                 fontSize: '48px', 
                 fill: '#888888',
-                fontStyle: 'bold'
-            }).setOrigin(0.5, 0.5);
+                fontStyle: 'bold',
+                resolution: 2
+            }).setOrigin(0.5, 0.5).setDepth(10000);
         }
         
         const finalScoreText = this.add.text(640, 360, 
             `Solari: ${Math.floor(this.player1Influence)} | Umbrae: ${Math.floor(this.player2Influence)}`, 
-            { fontSize: '24px', fill: '#ffffff' }
-        ).setOrigin(0.5, 0.5);
+            { fontSize: '24px', fill: '#ffffff', resolution: 2 }
+        ).setOrigin(0.5, 0.5).setDepth(10000);
         
         // Stop game updates
         this.scene.pause();

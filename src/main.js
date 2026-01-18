@@ -16,7 +16,7 @@ const config = {
     parent: 'game-container',
     width: gameWidth,
     height: gameHeight,
-    backgroundColor: '#1a1a2e',
+    backgroundColor: '#000000',
     pixelArt: true,      // pixel-art rendering
     roundPixels: true,   // snap to whole pixels
     antialias: false,    // keep sprites sharp

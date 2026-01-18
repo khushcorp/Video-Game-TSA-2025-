@@ -7,19 +7,25 @@ export class Volcano extends Phaser.Scene {
 
     create() {
         // ===== LEVEL SETUP =====
-        this.cameras.main.setZoom(0.7);
-        this.centerGameplayCamera();
+        this.cameras.main.setZoom(1.0);
+        
+        // Design the level for a 1280x720 viewport (Standard FIT resolution)
+        const worldWidth = 1280;
+        const worldHeight = 720;
         
         // Set physics world bounds
-        this.physics.world.setBounds(0, 0, 1828, 1028);
+        this.physics.world.setBounds(0, 0, worldWidth, worldHeight);
+        
+        // Center camera on the level
+        this.cameras.main.setBounds(0, 0, worldWidth, worldHeight);
+        this.cameras.main.centerOn(worldWidth / 2, worldHeight / 2);
         
         // ===== BACKGROUND =====
         this.createBackground();
-        this.scale.on('resize', this.centerGameplayCamera, this);
         
-        // Lava glow effects
+        // Lava glow effects - adjusted for new ground position
         for (let i = 0; i < 5; i++) {
-            const glow = this.add.circle(200 + i * 350, 950, 50 + Math.random() * 30, 0xFF4500, 0.3);
+            const glow = this.add.circle(200 + i * 220, 680, 50 + Math.random() * 30, 0xFF4500, 0.3);
             this.tweens.add({
                 targets: glow,
                 alpha: { from: 0.3, to: 0.6 },
@@ -29,24 +35,26 @@ export class Volcano extends Phaser.Scene {
             });
         }
         
-        // ===== INFLUENCE BARS UI (copied from Start.js) =====
+        // ===== INFLUENCE BARS UI (screen-anchored) =====
         this.player1Influence = 0;
         this.player2Influence = 0;
         this.maxInfluence = 500;
         
-        this.player1BarBg = this.add.rectangle(320, 30, 400, 30, 0x333333);
+        const uiPadding = 320;
+        this.player1BarBg = this.add.rectangle(uiPadding, 30, 400, 30, 0x333333);
         this.player1BarBg.setOrigin(0.5, 0.5);
-        this.player1BarFill = this.add.rectangle(120, 30, 0, 25, 0xFFD700);
+        this.player1BarFill = this.add.rectangle(uiPadding - 200, 30, 0, 25, 0xFFD700);
         this.player1BarFill.setOrigin(0, 0.5);
-        this.player1InfluenceText = this.add.text(320, 55, '0/500', { fontSize: '14px', fill: '#ffffff' }).setOrigin(0.5, 0.5).setDepth(5000);
-        this.player1NameText = this.add.text(320, 75, 'SOLARI', { fontSize: '18px', fill: '#FFD700', fontStyle: 'bold' }).setOrigin(0.5, 0.5).setDepth(5000);
+        this.player1InfluenceText = this.add.text(uiPadding, 55, '0/500', { fontSize: '14px', fill: '#ffffff', resolution: 2 }).setOrigin(0.5, 0.5).setDepth(10000);
+        this.player1NameText = this.add.text(uiPadding, 75, 'SOLARI', { fontSize: '18px', fill: '#FFD700', fontStyle: 'bold', resolution: 2 }).setOrigin(0.5, 0.5).setDepth(10000);
         
-        this.player2BarBg = this.add.rectangle(1508, 30, 400, 30, 0x333333);
+        const p2X = 1280 - uiPadding;
+        this.player2BarBg = this.add.rectangle(p2X, 30, 400, 30, 0x333333);
         this.player2BarBg.setOrigin(0.5, 0.5);
-        this.player2BarFill = this.add.rectangle(1308, 30, 0, 25, 0x8B00FF);
+        this.player2BarFill = this.add.rectangle(p2X - 200, 30, 0, 25, 0x8B00FF);
         this.player2BarFill.setOrigin(0, 0.5);
-        this.player2InfluenceText = this.add.text(1508, 55, '0/500', { fontSize: '14px', fill: '#ffffff' }).setOrigin(0.5, 0.5).setDepth(5000);
-        this.player2NameText = this.add.text(1508, 75, 'UMBRAE', { fontSize: '18px', fill: '#8B00FF', fontStyle: 'bold' }).setOrigin(0.5, 0.5).setDepth(5000);
+        this.player2InfluenceText = this.add.text(p2X, 55, '0/500', { fontSize: '14px', fill: '#ffffff', resolution: 2 }).setOrigin(0.5, 0.5).setDepth(10000);
+        this.player2NameText = this.add.text(p2X, 75, 'UMBRAE', { fontSize: '18px', fill: '#8B00FF', fontStyle: 'bold', resolution: 2 }).setOrigin(0.5, 0.5).setDepth(10000);
         
         // Influence map blocks
         this.solariTerritoryBlocks = [];
@@ -64,39 +72,36 @@ export class Volcano extends Phaser.Scene {
         this.baseJumpVelocity = -550;
         
         // ===== RISING LAVA MECHANIC =====
-        // First event: Warning at 4:40 (20s), Lava at 4:30 (30s)
-        // Second event: Warning at 1:40 (200s), Lava at 1:30 (210s)
-        this.lavaRiseStartTime1 = 20; // First warning at 4:40 (20 seconds in)
-        this.lavaRiseActualStart1 = 30; // First lava at 4:30 (30 seconds in)
-        this.lavaRiseStartTime2 = 200; // Second warning at 1:40 (200 seconds in)
-        this.lavaRiseActualStart2 = 210; // Second lava at 1:30 (210 seconds in)
-        this.lavaRiseWarningDuration = 10; // 10 second warning countdown
-        this.lavaRiseDuration = 80; // HARDCODED: Lava rises for 80 seconds (4x slower - 75% reduction in speed)
+        this.lavaRiseStartTime1 = 20; 
+        this.lavaRiseActualStart1 = 30; 
+        this.lavaRiseStartTime2 = 200; 
+        this.lavaRiseActualStart2 = 210; 
+        this.lavaRiseWarningDuration = 10; 
+        this.lavaRiseDuration = 80; 
         this.lavaRiseTimer = 0;
         this.lavaRising = false;
         this.lavaWarningActive = false;
-        this.lavaMessageText = null; // Message text for lava events
-        this.lavaSurvivalChecked = false; // Track if survival check has been done
-        this.lavaEndTime = 0; // Track when lava ended (for ground correction skip)
-        this.lavaEventNumber = 0; // Track which lava event (1 or 2)
+        this.lavaMessageText = null; 
+        this.lavaSurvivalChecked = false; 
+        this.lavaEndTime = 0; 
+        this.lavaEventNumber = 0; 
         
-        // HARDCODED: Lava will be created at the END of create() function to ensure it's on top
-        // Initialize lava variables here but create the visual at the end
-        this.lavaStartY = 914; // Ground top
-        this.lavaTopY = 0; // Lava reaches top of screen
-        this.lavaCurrentY = 914;
+        this.lavaStartY = 640; // New ground top
+        this.lavaTopY = 0; 
+        this.lavaCurrentY = 640;
         this.lava = null;
         this.lavaGlow = null;
         this.lavaParticles = [];
         
         // Lava warning timer text
-        this.lavaWarningText = this.add.text(914, 100, '', {
+        this.lavaWarningText = this.add.text(1280 / 2, 100, '', {
             fontSize: '48px',
             fill: '#FF4500',
             fontStyle: 'bold',
             stroke: '#000000',
-            strokeThickness: 4
-        }).setOrigin(0.5, 0.5).setDepth(5000).setVisible(false);
+            strokeThickness: 4,
+            resolution: 2
+        }).setOrigin(0.5, 0.5).setDepth(10000).setVisible(false);
         
         // Player debuff flags (for lava damage)
         this.player1LavaDebuff = false;
@@ -114,35 +119,23 @@ export class Volcano extends Phaser.Scene {
         this.maxJumpHeight = 252;
         this.maxJumpDistance = 526;
         
-        // ===== LAVA JUMP ORBS =====
+        // ===== LAVA JUMP ORBS (Strategic placement) =====
         this.lavaOrbs = [];
-        // Orb positions - strategically placed for parkour (floating in air, not on ground)
         const orbPositions = [
-            { x: 500, y: 800 },   // Near left start platform
-            { x: 1328, y: 800 },  // Near right start platform
-            { x: 750, y: 650 },   // Mid-level left
-            { x: 1078, y: 650 },  // Mid-level right
-            { x: 650, y: 490 },   // Upper left
-            { x: 1178, y: 490 },  // Upper right
-            { x: 850, y: 350 },   // High left
-            { x: 978, y: 350 },   // High right
+            { x: 250, y: 500 },   // Left ascent start
+            { x: 1030, y: 500 },  // Right ascent start
+            { x: 640, y: 420 },   // Center gap crosser
+            { x: 400, y: 280 },   // Upper left path
+            { x: 880, y: 280 },   // Upper right path
+            { x: 640, y: 150 },   // Final summit boost
         ];
         
         orbPositions.forEach((pos, index) => {
-            // Outer glow ring - larger, softer
-            const orbGlow = this.add.circle(pos.x, pos.y, 30, 0xFF6347, 0.3);
-            orbGlow.setDepth(5);
+            const orbGlow = this.add.circle(pos.x, pos.y, 30, 0xFF6347, 0.3).setDepth(5);
+            const orbBody = this.add.circle(pos.x, pos.y, 20, 0xFF4500, 0.9).setDepth(6);
+            const orbCore = this.add.circle(pos.x, pos.y, 10, 0xFFD700, 1.0).setDepth(7);
             
-            // Main orb body - glowing lava sphere
-            const orbBody = this.add.circle(pos.x, pos.y, 20, 0xFF4500, 0.9);
-            orbBody.setDepth(6);
-            
-            // Inner hot core - bright center
-            const orbCore = this.add.circle(pos.x, pos.y, 10, 0xFFD700, 1.0);
-            orbCore.setDepth(7);
-            
-            // Floating animation - gentle up and down movement
-            const floatTween = this.tweens.add({
+            this.tweens.add({
                 targets: [orbGlow, orbBody, orbCore],
                 y: { from: pos.y - 5, to: pos.y + 5 },
                 duration: 1500 + Math.random() * 500,
@@ -151,57 +144,21 @@ export class Volcano extends Phaser.Scene {
                 ease: 'Sine.easeInOut'
             });
             
-            // Subtle rotation/pulse effect
-            const pulseTween = this.tweens.add({
-                targets: [orbGlow, orbBody],
-                scale: { from: 0.95, to: 1.05 },
-                alpha: { from: 0.7, to: 1.0 },
-                duration: 1000 + Math.random() * 300,
-                yoyo: true,
-                repeat: -1,
-                ease: 'Sine.easeInOut'
-            });
-            
-            // Charge timer text - shows remaining charge time
             const chargeTimerText = this.add.text(pos.x, pos.y - 40, '', {
-                fontSize: '16px',
-                fill: '#ffffff',
-                fontStyle: 'bold',
-                stroke: '#000000',
-                strokeThickness: 3
-            }).setOrigin(0.5, 0.5).setDepth(5000).setVisible(false);
+                fontSize: '16px', fill: '#ffffff', fontStyle: 'bold', stroke: '#000000', strokeThickness: 3, resolution: 2
+            }).setOrigin(0.5, 0.5).setDepth(10000).setVisible(false);
             
-            // Orb state
-            const orb = {
-                x: pos.x,
-                y: pos.y,
-                glow: orbGlow,
-                body: orbBody,
-                core: orbCore,
-                chargeTimerText: chargeTimerText, // Store timer text reference
-                floatTween: floatTween, // Store tween reference for editor
-                pulseTween: pulseTween, // Store tween reference
-                isCharged: true, // Start charged
-                isOnCooldown: false,
-                chargeTimer: 0,
-                chargeTime: 5.0, // Takes 5 seconds to charge
-                cooldownTimer: 0,
-                cooldownTime: 0.5, // 0.5 second cooldown after use
-                boostPower: -750, // Strong upward boost
-                radius: 25,
-                originalColors: {
-                    glow: 0xFF6347,
-                    body: 0xFF4500,
-                    core: 0xFFD700
-                }
-            };
-            
-            this.lavaOrbs.push(orb);
+            this.lavaOrbs.push({
+                x: pos.x, y: pos.y, glow: orbGlow, body: orbBody, core: orbCore,
+                chargeTimerText: chargeTimerText, isCharged: true, isOnCooldown: false,
+                chargeTimer: 0, chargeTime: 5.0, cooldownTimer: 0, cooldownTime: 0.5,
+                boostPower: -750, radius: 25, originalColors: { glow: 0xFF6347, body: 0xFF4500, core: 0xFFD700 }
+            });
         });
-        
+
         const romanNumerals = ['I','II','III','IV','V','VI','VII','VIII'];
         const labelOrder = Phaser.Utils.Array.Shuffle(romanNumerals.slice());
-        this.orbSequenceIndices = Phaser.Utils.Array.Shuffle([0,1,2,3,4,5,6,7]);
+        this.orbSequenceIndices = Phaser.Utils.Array.Shuffle([0,1,2,3,4,5]); // Only 6 orbs now
         this.orbSequenceNumerals = this.orbSequenceIndices.map(i => labelOrder[i]);
         this.orbSequenceProgress = { Solari: 0, Umbrae: 0 };
         this.orbSequenceLastTouched = { Solari: null, Umbrae: null };
@@ -216,32 +173,195 @@ export class Volcano extends Phaser.Scene {
             const numeral = labelOrder[i];
             orb.romanNumeral = numeral;
             orb.romanText = this.add.text(orb.x, orb.y + 40, numeral, {
-                fontSize: '20px',
-                fill: '#FFFFFF',
-                fontStyle: 'bold',
-                stroke: '#000000',
-                strokeThickness: 3
-            }).setOrigin(0.5, 0.5).setDepth(5000);
+                fontSize: '20px', fill: '#FFFFFF', fontStyle: 'bold', stroke: '#000000', strokeThickness: 3, resolution: 2
+            }).setOrigin(0.5, 0.5).setDepth(10000);
         });
         
-        // ===== PLATFORMS =====
+        // ===== PLATFORMS (Ascent Design) =====
         this.platforms = [];
         this.fallingPlatforms = [];
         
-        // Ground platform at bottom of screen - HARDCODED VALUES
-        // World height: 1028, ground height: 114
-        // HARDCODED: Ground center Y = 971, Ground top Y = 914
-        const HARDCODED_GROUND_HEIGHT = 114;
-        const HARDCODED_GROUND_CENTER_X = 914;
-        const HARDCODED_GROUND_CENTER_Y = 971;
-        const HARDCODED_GROUND_TOP = 914;
-        const HARDCODED_GROUND_WIDTH = 2000;
+        // Generate Magma Platform Texture
+        if (!this.textures.exists('magma-platform')) {
+            const magmaCanvas = this.textures.createCanvas('magma-platform', 32, 32);
+            const ctx = magmaCanvas.context;
+            
+            // Base Rock (Dark Basalt)
+            ctx.fillStyle = '#1A1A1A';
+            ctx.fillRect(0, 0, 32, 32);
+            
+            // Rock chunks (Dark Brown/Red)
+            ctx.fillStyle = '#3D1F1F';
+            ctx.fillRect(2, 2, 12, 12);
+            ctx.fillRect(18, 4, 10, 10);
+            ctx.fillRect(4, 18, 14, 10);
+            ctx.fillRect(20, 20, 8, 8);
+            
+            // Lava Cracks (Orange/Red)
+            ctx.fillStyle = '#8B0000'; // Dark Red base for cracks
+            ctx.fillRect(0, 14, 32, 2);
+            ctx.fillRect(14, 0, 2, 32);
+            
+            ctx.fillStyle = '#FF4500'; // Bright Orange Glow
+            ctx.fillRect(0, 15, 32, 1);
+            ctx.fillRect(15, 0, 1, 32);
+            
+            // Hot spots (Yellow)
+            ctx.fillStyle = '#FFD700';
+            ctx.fillRect(15, 15, 2, 2);
+            ctx.fillRect(2, 15, 1, 1);
+            ctx.fillRect(15, 2, 1, 1);
+            
+            magmaCanvas.refresh();
+            this.textures.get('magma-platform').setFilter(Phaser.Textures.FilterMode.NEAREST);
+        }
+
+        // Generate Drum Platform Texture (Blue version of magma)
+        if (!this.textures.exists('drum-platform')) {
+            const drumCanvas = this.textures.createCanvas('drum-platform', 32, 32);
+            const ctx = drumCanvas.context;
+            
+            ctx.fillStyle = '#1A1A1A';
+            ctx.fillRect(0, 0, 32, 32);
+            
+            ctx.fillStyle = '#1F2D3D'; // Dark Blue-Grey Rock
+            ctx.fillRect(2, 2, 12, 12);
+            ctx.fillRect(18, 4, 10, 10);
+            ctx.fillRect(4, 18, 14, 10);
+            ctx.fillRect(20, 20, 8, 8);
+            
+            ctx.fillStyle = '#00008B'; // Dark Blue cracks
+            ctx.fillRect(0, 14, 32, 2);
+            ctx.fillRect(14, 0, 2, 32);
+            
+            ctx.fillStyle = '#0066CC'; // Electric Blue Glow
+            ctx.fillRect(0, 15, 32, 1);
+            ctx.fillRect(15, 0, 1, 32);
+            
+            ctx.fillStyle = '#00FFFF'; // Cyan hot spots
+            ctx.fillRect(15, 15, 2, 2);
+            
+            drumCanvas.refresh();
+            this.textures.get('drum-platform').setFilter(Phaser.Textures.FilterMode.NEAREST);
+        }
+
+        // Generate Falling Magma Platform Texture (Intense "Level 5" Danger)
+        if (!this.textures.exists('falling-magma-platform')) {
+            const fallingCanvas = this.textures.createCanvas('falling-magma-platform', 32, 32);
+            const ctx = fallingCanvas.context;
+            
+            // 1. Base (Pitch Black scorched rock for max contrast)
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(0, 0, 32, 32);
+            
+            // 2. Deep Under-Glow (Dark Red)
+            ctx.fillStyle = '#660000';
+            ctx.fillRect(2, 2, 28, 28);
+            
+            // 3. Primary Wide Cracks (Bright Orange-Red)
+            ctx.fillStyle = '#FF4500';
+            // Thick jagged horizontal crack
+            ctx.fillRect(0, 12, 32, 4);
+            // Thick jagged vertical crack
+            ctx.fillRect(14, 0, 4, 32);
+            
+            // 4. Secondary Sharp Cracks (Bright Orange)
+            ctx.fillStyle = '#FF8C00';
+            ctx.fillRect(0, 13, 32, 2);
+            ctx.fillRect(15, 0, 2, 32);
+            // Diagonal shatters
+            ctx.beginPath();
+            ctx.strokeStyle = '#FF8C00';
+            ctx.lineWidth = 2;
+            ctx.moveTo(0, 0); ctx.lineTo(14, 12);
+            ctx.moveTo(32, 0); ctx.lineTo(18, 12);
+            ctx.moveTo(0, 32); ctx.lineTo(14, 16);
+            ctx.moveTo(32, 32); ctx.lineTo(18, 16);
+            ctx.stroke();
+            
+            // 5. INTENSE CORE GLOW (Yellow/White) - This makes it "Stand Out"
+            ctx.fillStyle = '#FFD700'; // Gold/Yellow
+            // Intersection glow
+            ctx.fillRect(13, 11, 6, 6);
+            // Small highlight cracks
+            ctx.fillStyle = '#FFFF00'; 
+            ctx.fillRect(0, 14, 32, 1);
+            ctx.fillRect(15, 0, 1, 32);
+            
+            // 6. HOTTEST SPOTS (Pure White) - Level 5 Danger
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillRect(15, 13, 2, 2); // Center core
+            ctx.fillRect(4, 4, 1, 1);
+            ctx.fillRect(27, 27, 1, 1);
+            ctx.fillRect(27, 4, 1, 1);
+            ctx.fillRect(4, 27, 1, 1);
+            
+            // 7. Surface Embers (Random bright pixels)
+            ctx.fillStyle = '#FF4500';
+            ctx.fillRect(8, 6, 2, 2);
+            ctx.fillRect(22, 24, 2, 2);
+            
+            fallingCanvas.refresh();
+            this.textures.get('falling-magma-platform').setFilter(Phaser.Textures.FilterMode.NEAREST);
+        }
+
+        // Generate Sci-Fi Pressure Plate Texture for Fault Lines
+        if (!this.textures.exists('sci-fi-plate')) {
+            // Updated to 50x20 to perfectly fit the platform height (20) and width (150/200)
+            const plateCanvas = this.textures.createCanvas('sci-fi-plate', 50, 20);
+            const ctx = plateCanvas.context;
+            
+            // 1. Outer Casing (Polished Steel Grey instead of Black)
+            ctx.fillStyle = '#555555';
+            ctx.fillRect(0, 0, 50, 20);
+            
+            // 2. Industrial Bevel (Lighter highlight on top edge for 3D effect)
+            ctx.fillStyle = '#888888';
+            ctx.fillRect(0, 0, 50, 1);
+            
+            // 3. Metallic Frame (Dark Grey)
+            ctx.fillStyle = '#333333';
+            ctx.fillRect(1, 1, 48, 18);
+            
+            // 4. Blue Structural Trim (Deep Blue)
+            ctx.fillStyle = '#004488';
+            ctx.fillRect(3, 3, 44, 14);
+            
+            // 4. Inner Recessed Plate (Darker Blue-Grey)
+            ctx.fillStyle = '#1A222E';
+            ctx.fillRect(5, 5, 40, 10);
+            
+            // 5. Glowing Pads (Light Blue/Cyan) - Perfectly Symmetrical
+            // We'll place three distinct square pads
+            ctx.fillStyle = '#00FFFF';
+            ctx.fillRect(10, 7, 6, 6); // Left pad
+            ctx.fillRect(22, 7, 6, 6); // Middle pad
+            ctx.fillRect(34, 7, 6, 6); // Right pad
+            
+            // 6. White Power Cores (Center of each pad)
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillRect(12, 9, 2, 2);
+            ctx.fillRect(24, 9, 2, 2);
+            ctx.fillRect(36, 9, 2, 2);
+            
+            // 7. Symmetrical Detail Dots (Symmetry check)
+            ctx.fillStyle = '#0088FF';
+            ctx.fillRect(6, 6, 2, 2);   // Top-Left detail
+            ctx.fillRect(42, 6, 2, 2);  // Top-Right detail
+            ctx.fillRect(6, 12, 2, 2);  // Bottom-Left detail
+            ctx.fillRect(42, 12, 2, 2); // Bottom-Right detail
+            
+            plateCanvas.refresh();
+            this.textures.get('sci-fi-plate').setFilter(Phaser.Textures.FilterMode.NEAREST);
+        }
+
+        const HARDCODED_GROUND_HEIGHT = 80;
+        const HARDCODED_GROUND_TOP = 640;
+        const HARDCODED_GROUND_CENTER_Y = 680;
         
-        const ground = this.add.rectangle(HARDCODED_GROUND_CENTER_X, HARDCODED_GROUND_CENTER_Y, HARDCODED_GROUND_WIDTH, HARDCODED_GROUND_HEIGHT, 0x4a1a0a);
-        ground.setOrigin(0.5, 0.5);
-        ground.setDepth(1);
-        ground.setStrokeStyle(2, 0x8B4513);
-        // The 'true' parameter makes it static - static bodies are automatically immovable
+        // Ground using Magma Texture
+        const ground = this.add.tileSprite(1280/2, HARDCODED_GROUND_CENTER_Y, 2000, HARDCODED_GROUND_HEIGHT, 'magma-platform');
+        ground.setOrigin(0.5, 0.5).setDepth(1).setTileScale(1, 1);
         this.physics.add.existing(ground, true);
         this.platforms.push(ground);
         
@@ -254,114 +374,69 @@ export class Volcano extends Phaser.Scene {
         this.solariScaleCount = 0;
         this.umbraeScaleCount = 0;
         
-        // HARDCODED: Create lava at the END after everything else, but HIDE it initially
-        // Lava should only be visible when it starts rising (after 30 seconds)
+        // Create lava (adjusted for new ground)
         this.time.delayedCall(100, () => {
-            // HARDCODED: Create lava with ABSOLUTE MAXIMUM visibility settings
-            const lavaStartY = 914; // Ground top - HARDCODED
+            const lavaStartY = 640; 
             this.lavaStartY = lavaStartY;
             this.lavaCurrentY = lavaStartY;
-            
-            // Main lava body - HARDCODED: Fill from bottom like water
-            // Start with 0 height, grow upward from ground level
-            this.lava = this.add.rectangle(914, lavaStartY, 2000, 0, 0xFF4500); // Start with 0 height
-            this.lava.setOrigin(0.5, 1.0); // HARDCODED: Origin at bottom center so it grows upward
-            this.lava.setDepth(999); // HARDCODED: MAXIMUM DEPTH - above everything
-            this.lava.setAlpha(1.0); // Full opacity
-            this.lava.setVisible(false); // HARDCODED: HIDE initially - only show when rising starts
-            this.lava.y = lavaStartY; // Keep at ground level, will grow upward
-            
-            // Lava glow - positioned at top of lava (will update as lava rises)
-            this.lavaGlow = this.add.rectangle(914, lavaStartY, 2000, 50, 0xFF6347);
-            this.lavaGlow.setOrigin(0.5, 0.5);
-            this.lavaGlow.setDepth(1000); // Even higher
-            this.lavaGlow.setAlpha(1.0); // Full opacity
-            this.lavaGlow.setVisible(false); // HARDCODED: HIDE initially
-            
-            // Lava particles
+            this.lava = this.add.rectangle(1280/2, lavaStartY, 2000, 0, 0xFF4500).setOrigin(0.5, 1.0).setDepth(999).setVisible(false);
+            this.lavaGlow = this.add.rectangle(1280/2, lavaStartY, 2000, 50, 0xFF6347).setOrigin(0.5, 0.5).setDepth(1000).setVisible(false);
             this.lavaParticles = [];
             for (let i = 0; i < 20; i++) {
-                const particle = this.add.circle(
-                    100 + (i * 80), 
-                    lavaStartY - 100, 
-                    10, // HARDCODED: Big particles
-                    0xFFD700, 
-                    1.0
-                );
-                particle.setDepth(1001);
-                particle.setVisible(false); // HARDCODED: HIDE initially
+                const particle = this.add.circle(100 + (i * 60), lavaStartY - 100, 8, 0xFFD700, 1.0).setDepth(1001).setVisible(false);
                 this.lavaParticles.push(particle);
             }
-            
-            console.log('=== HARDCODED LAVA CREATED (HIDDEN) ===');
-            console.log('Lava Y:', this.lava.y, 'Visible:', this.lava.visible, 'Depth:', this.lava.depth);
-            console.log('Lava exists:', !!this.lava);
         });
         
-        // Platform layout - all moved down by 341 pixels (old ground top 573, new ground top 914)
-        // Added more platforms for grander parkour
+        // New Parkour Platform Data (Ascent path)
         const platformData = [
-            // Starting platforms near ground (easy access)
-            { x: 400, y: 820, w: 200, h: 30, falling: false },      // Left start
-            { x: 1428, y: 820, w: 200, h: 30, falling: false },     // Right start
+            // Tier 1 (Low)
+            { x: 200, y: 550, w: 150, h: 20, falling: false },
+            { x: 1080, y: 550, w: 150, h: 20, falling: false },
+            { x: 640, y: 520, w: 200, h: 20, falling: false }, // Central start
             
-            // First tier (easy-medium jumps from ground)
-            { x: 600, y: 790, w: 180, h: 30, falling: false },      // Left tier 1
-            { x: 1228, y: 790, w: 180, h: 30, falling: false },     // Right tier 1
-            { x: 914, y: 750, w: 220, h: 30, falling: false },      // Center tier 1
+            // Tier 2 (Mid-Low)
+            { x: 400, y: 450, w: 120, h: 20, falling: true },
+            { x: 880, y: 450, w: 120, h: 20, falling: true },
+            { x: 640, y: 400, w: 150, h: 20, falling: false }, // Drum platform
             
-            // Second tier (medium difficulty)
-            { x: 500, y: 690, w: 160, h: 30, falling: false },      // Left tier 2
-            { x: 1328, y: 690, w: 160, h: 30, falling: false },      // Right tier 2
-            { x: 800, y: 650, w: 140, h: 30, falling: true },        // Left center tier 2 - FALLING
-            { x: 1028, y: 650, w: 140, h: 30, falling: true },      // Right center tier 2 - FALLING
+            // Tier 3 (Mid-High)
+            { x: 250, y: 350, w: 100, h: 20, falling: false },
+            { x: 1030, y: 350, w: 100, h: 20, falling: false },
+            { x: 500, y: 300, w: 120, h: 20, falling: true },
+            { x: 780, y: 300, w: 120, h: 20, falling: true },
             
-            // Third tier (harder jumps)
-            { x: 700, y: 590, w: 150, h: 30, falling: false },      // Left tier 3
-            { x: 1128, y: 590, w: 150, h: 30, falling: false },     // Right tier 3
-            { x: 914, y: 550, w: 180, h: 30, falling: false },      // Center tier 3
+            // Tier 4 (High)
+            { x: 640, y: 220, w: 180, h: 20, falling: false },
+            { x: 350, y: 180, w: 100, h: 20, falling: false },
+            { x: 930, y: 180, w: 100, h: 20, falling: false },
             
-            // Fourth tier (very challenging)
-            { x: 450, y: 490, w: 130, h: 30, falling: true },       // Left tier 4 - FALLING
-            { x: 1378, y: 490, w: 130, h: 30, falling: true },       // Right tier 4 - FALLING
-            { x: 750, y: 450, w: 120, h: 30, falling: false },      // Left center tier 4
-            { x: 1078, y: 450, w: 120, h: 30, falling: false },     // Right center tier 4
-            
-            // Fifth tier (expert level)
-            { x: 600, y: 390, w: 110, h: 30, falling: false },       // Left tier 5
-            { x: 1228, y: 390, w: 110, h: 30, falling: false },     // Right tier 5
-            { x: 914, y: 350, w: 160, h: 30, falling: true },        // Center tier 5 - FALLING
-            
-            // Sixth tier (master level)
-            { x: 500, y: 290, w: 100, h: 30, falling: false },       // Left tier 6
-            { x: 1328, y: 290, w: 100, h: 30, falling: false },     // Right tier 6
-            { x: 850, y: 250, w: 90, h: 30, falling: true },        // Left center tier 6 - FALLING
-            { x: 978, y: 250, w: 90, h: 30, falling: true },         // Right center tier 6 - FALLING
-            
-            // Top tier (legendary)
-            { x: 914, y: 150, w: 200, h: 30, falling: false },       // Top center - ultimate challenge
+            // Tier 5 (Peak)
+            { x: 640, y: 100, w: 250, h: 20, falling: false },
         ];
         
         platformData.forEach((data) => {
-            let color = data.falling ? 0xFF6347 : 0x8B4513;
-            if (
-                (!data.falling && data.x === 600 && data.y === 790) ||
-                (!data.falling && data.x === 914 && data.y === 750) ||
-                (!data.falling && data.x === 1228 && data.y === 790)
-            ) {
-                color = 0x0066CC;
-            }
-            const platform = this.add.rectangle(data.x, data.y, data.w, data.h, color);
-            platform.setOrigin(0.5, 0.5);
+            let platform;
+            const isDrum = (data.y === 550 || (data.x === 640 && data.y === 400));
+            
             if (data.falling) {
-                platform.setStrokeStyle(2, 0xFF4500);
+                // Falling platforms use the new unstable fiery magma texture
+                platform = this.add.tileSprite(data.x, data.y, data.w, data.h, 'falling-magma-platform').setOrigin(0.5, 0.5);
+            } else if (isDrum) {
+                // Apply Sci-Fi Pressure Plate pixel art to drum platforms
+                platform = this.add.tileSprite(data.x, data.y, data.w, data.h, 'sci-fi-plate').setOrigin(0.5, 0.5);
+            } else {
+                // Other static platforms use Magma texture
+                platform = this.add.tileSprite(data.x, data.y, data.w, data.h, 'magma-platform').setOrigin(0.5, 0.5);
             }
+            
             this.physics.add.existing(platform, true);
             this.platforms.push(platform);
             
             if (data.falling) {
                 platform.isFalling = false;
                 platform.fallTimer = 0;
+                platform.originalX = data.x;
                 platform.originalY = data.y;
                 platform.playersOnPlatform = new Set();
                 platform.colliders = [];
@@ -369,83 +444,92 @@ export class Volcano extends Phaser.Scene {
             }
         });
         
+        // ===== LADDERS (Recovery paths) =====
         this.vines = [];
-        const leftLadder = this.add.rectangle(250, 664, 24, 500, 0xCCCCCC);
-        leftLadder.setOrigin(0.5, 0.5);
+        
+        // Generate procedural pixel art ladder texture if it doesn't exist
+        if (!this.textures.exists('ladder-pixel')) {
+            // Increased size to 32x32 and adjusted drawing for chunkier, more pixelated look
+            const ladderCanvas = this.textures.createCanvas('ladder-pixel', 32, 32);
+            const ctx = ladderCanvas.context;
+            
+            // Background (transparent)
+            ctx.clearRect(0, 0, 32, 32);
+            
+            // Rails (Brownish-red) - Thicker rails for "chunky" pixel look
+            ctx.fillStyle = '#5D2906'; // Dark brown base
+            ctx.fillRect(0, 0, 6, 32);  // Left rail (6px wide)
+            ctx.fillRect(26, 0, 6, 32); // Right rail (6px wide)
+            
+            // Rail highlights (Lighter brown) - 2px wide highlights
+            ctx.fillStyle = '#8B4513';
+            ctx.fillRect(2, 0, 2, 32);
+            ctx.fillRect(28, 0, 2, 32);
+            
+            // Rungs (Brown with red heat) - Chunkier 8px high rungs
+            ctx.fillStyle = '#5D2906';
+            ctx.fillRect(6, 12, 20, 8); // Rung base
+            
+            // Heat highlights on rungs - Increased detail blocks
+            ctx.fillStyle = '#FF4500'; // OrangeRed heat
+            ctx.fillRect(8, 14, 16, 4);
+            ctx.fillStyle = '#FF0000'; // Pure red hot spot center
+            ctx.fillRect(12, 15, 8, 2);
+            
+            ladderCanvas.refresh();
+            
+            // Ensure pixel art clarity
+            this.textures.get('ladder-pixel').setFilter(Phaser.Textures.FilterMode.NEAREST);
+        }
+
+        const leftLadder = this.add.tileSprite(100, 400, 32, 480, 'ladder-pixel').setOrigin(0.5, 0.5);
         this.physics.add.existing(leftLadder, true);
         this.vines.push(leftLadder);
-        const rightLadder = this.add.rectangle(1578, 664, 24, 500, 0xCCCCCC);
-        rightLadder.setOrigin(0.5, 0.5);
+        
+        const rightLadder = this.add.tileSprite(1180, 400, 32, 480, 'ladder-pixel').setOrigin(0.5, 0.5);
         this.physics.add.existing(rightLadder, true);
         this.vines.push(rightLadder);
         
-        const scalePlatform = this.platforms.find(p => Math.abs(p.x - 914) < 1 && Math.abs(p.y - 550) < 1);
-        const scaleBaseY = scalePlatform ? scalePlatform.y - scalePlatform.height / 2 : 520;
-        const scaleXs = scalePlatform ? [scalePlatform.x - 80, scalePlatform.x, scalePlatform.x + 80] : [834, 914, 994];
-        const fillHeight = 60;
+        // ===== DRUM PLATES (Mechanic) =====
+        // Connect the mechanics to the new platform positions
+        const drumPlateTargets = [
+            { x: 200, y: 550 },
+            { x: 640, y: 400 },
+            { x: 1080, y: 550 }
+        ];
         
-        scaleXs.forEach((x, index) => {
-            const base = this.add.rectangle(x, scaleBaseY + 10, 30, 10, 0x444444);
-            base.setOrigin(0.5, 1.0);
-            base.setDepth(3);
+        this.scales = [];
+        drumPlateTargets.forEach((pos, index) => {
+            const x = pos.x;
+            const baseY = pos.y - 10;
+            const fillMax = 60;
             
-            const tubeBg = this.add.rectangle(x, scaleBaseY, 20, fillHeight, 0x222222);
-            tubeBg.setOrigin(0.5, 1.0);
-            tubeBg.setDepth(3);
-            
-            const tubeFill = this.add.rectangle(x, scaleBaseY, 16, 0, 0x888888);
-            tubeFill.setOrigin(0.5, 0.0);
-            tubeFill.setDepth(4);
-            
-            const indicator = this.add.text(x, scaleBaseY - fillHeight - 20, '✕', {
-                fontSize: '28px',
-                fill: '#FF0000',
-                fontStyle: 'bold'
-            }).setOrigin(0.5, 0.5).setDepth(5000);
+            const base = this.add.rectangle(x, baseY + 10, 30, 10, 0x444444).setOrigin(0.5, 1.0).setDepth(3);
+            const tubeBg = this.add.rectangle(x, baseY, 20, fillMax, 0x222222).setOrigin(0.5, 1.0).setDepth(3);
+            const tubeFill = this.add.rectangle(x, baseY, 16, 0, 0x888888).setOrigin(0.5, 0.0).setDepth(4);
+            const indicator = this.add.text(x, baseY - fillMax - 20, '✕', {
+                fontSize: '28px', fill: '#FF0000', fontStyle: 'bold', resolution: 2
+            }).setOrigin(0.5, 0.5).setDepth(10000);
             
             this.scales.push({
-                index: index,
-                base: base,
-                tubeBg: tubeBg,
-                tubeFill: tubeFill,
-                indicator: indicator,
-                owner: null,
-                capturePlayer: null,
-                captureProgress: 0,
-                fillMaxHeight: fillHeight,
-                fillBottomY: scaleBaseY
+                index, base, tubeBg, tubeFill, indicator, owner: null,
+                capturePlayer: null, captureProgress: 0, fillMaxHeight: fillMax, fillBottomY: baseY
             });
         });
         
-        const controlTargets = [
-            { x: 600, y: 790 },
-            { x: 914, y: 750 },
-            { x: 1228, y: 790 }
-        ];
         this.faultlinePlates = [];
-        controlTargets.forEach(target => {
+        drumPlateTargets.forEach(target => {
             const plat = this.platforms.find(p => Math.abs(p.x - target.x) < 1 && Math.abs(p.y - target.y) < 1);
-            if (plat) {
-                this.faultlinePlates.push({
-                    body: plat
-                });
-            }
+            if (plat) this.faultlinePlates.push({ body: plat });
         });
         
         // ===== PLAYERS =====
-        // HARDCODED VALUES - Ground top is 914, player half height is 35.5
-        // Player spawn Y = 914 - 35.5 = 878.5 (HARDCODED)
-        const HARDCODED_PLAYER_SPAWN_Y = this.HARDCODED_GROUND_TOP - this.HARDCODED_PLAYER_HALF_HEIGHT; // 878.5
+        const HARDCODED_PLAYER_SPAWN_Y = 640 - this.HARDCODED_PLAYER_HALF_HEIGHT; 
         
-        // Create players at exact ground position
-        this.player1 = this.add.rectangle(400, HARDCODED_PLAYER_SPAWN_Y, 71, 71, 0xFFD700);
-        this.player1.setOrigin(0.5, 0.5);
+        this.player1 = this.add.rectangle(400, HARDCODED_PLAYER_SPAWN_Y, 71, 71, 0xFFD700).setOrigin(0.5, 0.5);
         this.physics.add.existing(this.player1);
-        this.player1.body.setCollideWorldBounds(true);
-        this.player1.body.setSize(71, 71);
-        this.player1.body.setGravityY(this.gravity);
-        this.player1.setDepth(20);
-        this.player1.faction = 'Solari';
+        this.player1.body.setCollideWorldBounds(true).setSize(71, 71).setGravityY(this.gravity);
+        this.player1.setDepth(20).faction = 'Solari';
         this.player1.climbing = false;
         this.player1.onVine = null;
         this.player1.latchedToVine = false;
@@ -453,17 +537,12 @@ export class Volcano extends Phaser.Scene {
         this.player1.vineIndicator = null;
         this.player1.vineLatchCooldown = 0;
         this.player1.vineClimbSpeed = this.climbSpeed;
-        // Force position immediately
         this.player1.y = HARDCODED_PLAYER_SPAWN_Y;
         
-        this.player2 = this.add.rectangle(1428, HARDCODED_PLAYER_SPAWN_Y, 71, 71, 0x8B00FF);
-        this.player2.setOrigin(0.5, 0.5);
+        this.player2 = this.add.rectangle(880, HARDCODED_PLAYER_SPAWN_Y, 71, 71, 0x8B00FF).setOrigin(0.5, 0.5);
         this.physics.add.existing(this.player2);
-        this.player2.body.setCollideWorldBounds(true);
-        this.player2.body.setSize(71, 71);
-        this.player2.body.setGravityY(this.gravity);
-        this.player2.setDepth(20);
-        this.player2.faction = 'Umbrae';
+        this.player2.body.setCollideWorldBounds(true).setSize(71, 71).setGravityY(this.gravity);
+        this.player2.setDepth(20).faction = 'Umbrae';
         this.player2.climbing = false;
         this.player2.onVine = null;
         this.player2.latchedToVine = false;
@@ -471,42 +550,27 @@ export class Volcano extends Phaser.Scene {
         this.player2.vineIndicator = null;
         this.player2.vineLatchCooldown = 0;
         this.player2.vineClimbSpeed = this.climbSpeed;
-        // Force position immediately
         this.player2.y = HARDCODED_PLAYER_SPAWN_Y;
         
-        // Store hardcoded spawn Y for update loop
         this.HARDCODED_PLAYER_SPAWN_Y = HARDCODED_PLAYER_SPAWN_Y;
         
-        // Collisions - store colliders for falling platforms so we can remove them
         this.platforms.forEach(platform => {
             const collider1 = this.physics.add.collider(this.player1, platform);
             const collider2 = this.physics.add.collider(this.player2, platform);
-            if (platform.colliders) {
-                platform.colliders.push(collider1, collider2);
-            }
+            if (platform.colliders) platform.colliders.push(collider1, collider2);
         });
         
-        // HARDCODE: Force players to be exactly on ground immediately and repeatedly
-        this.time.delayedCall(0, () => {
-            this.player1.y = this.HARDCODED_PLAYER_SPAWN_Y;
-            this.player2.y = this.HARDCODED_PLAYER_SPAWN_Y;
-        });
-        this.time.delayedCall(10, () => {
-            this.player1.y = this.HARDCODED_PLAYER_SPAWN_Y;
-            this.player2.y = this.HARDCODED_PLAYER_SPAWN_Y;
-        });
-        this.time.delayedCall(50, () => {
-            this.player1.y = this.HARDCODED_PLAYER_SPAWN_Y;
-            this.player2.y = this.HARDCODED_PLAYER_SPAWN_Y;
-            this.player1.body.setVelocityY(0);
-            this.player2.body.setVelocityY(0);
-        });
-        this.time.delayedCall(100, () => {
-            this.player1.y = this.HARDCODED_PLAYER_SPAWN_Y;
-            this.player2.y = this.HARDCODED_PLAYER_SPAWN_Y;
-            this.player1.body.setVelocityY(0);
-            this.player2.body.setVelocityY(0);
-        });
+        // Repeatedly force player to ground at start to prevent falling through
+        for (let t of [0, 10, 50, 100, 200]) {
+            this.time.delayedCall(t, () => {
+                this.player1.y = this.HARDCODED_PLAYER_SPAWN_Y;
+                this.player2.y = this.HARDCODED_PLAYER_SPAWN_Y;
+                if (t > 10) {
+                    this.player1.body.setVelocityY(0);
+                    this.player2.body.setVelocityY(0);
+                }
+            });
+        }
         
         // ===== INPUT =====
         this.cursorsWASD = this.input.keyboard.addKeys('W,S,A,D');
@@ -519,19 +583,69 @@ export class Volcano extends Phaser.Scene {
         // ===== LEVEL TIMER =====
         this.levelTime = 0;
         this.levelDuration = 300;
-        // Timer positioned at center x (914) and very high y value
-        this.timeText = this.add.text(914, 50, '5:00', { fontSize: '24px', fill: '#ffffff' }).setOrigin(0.5, 0.5).setDepth(5000);
+        this.timeText = this.add.text(1280 / 2, 50, '5:00', { fontSize: '24px', fill: '#ffffff', resolution: 2 }).setOrigin(0.5, 0.5).setDepth(10000);
         
         // ===== INFLUENCE SYSTEM =====
         this.influenceRate = 0;
-        this.playersFrozen = false;
+        this.playersFrozen = true;
         this.influencePenalty = null;
         this.influenceReward = null;
+        this.startCountdown();
+    }
+
+    startCountdown() {
+        const countdownValues = ['3', '2', '1', 'GO!'];
+        let currentIndex = 0;
+
+        const showNext = () => {
+            if (currentIndex >= countdownValues.length) {
+                this.playersFrozen = false;
+                return;
+            }
+
+            const value = countdownValues[currentIndex];
+            // CENTER OF DESIGN SPACE (1280x720)
+            const centerX = 640;
+            const centerY = 360;
+
+            const text = this.add.text(centerX, centerY, value, {
+                fontSize: '180px',
+                fill: '#ffff00',
+                fontStyle: 'bold',
+                stroke: '#000000',
+                strokeThickness: 12,
+                resolution: 2
+            }).setOrigin(0.5).setScale(0).setDepth(30000); // Remove setScrollFactor(0) for world-centering consistency
+
+            // Level 5 Danger Animation: Scale from 0 to massive, then fade
+            this.tweens.add({
+                targets: text,
+                scale: 4,
+                alpha: { from: 1, to: 0.5 },
+                duration: 800,
+                ease: 'Back.easeOut',
+                onComplete: () => {
+                    this.tweens.add({
+                        targets: text,
+                        alpha: 0,
+                        scale: 6,
+                        duration: 200,
+                        onComplete: () => {
+                            text.destroy();
+                            currentIndex++;
+                            showNext();
+                        }
+                    });
+                }
+            });
+        };
+
+        showNext();
     }
 
     centerGameplayCamera() {
-        const worldWidth = 1828;
-        const worldHeight = 1028;
+        const worldWidth = 1280;
+        const worldHeight = 720;
         const zoom = this.cameras.main ? (this.cameras.main.zoom || 1) : 1;
         const viewWidth = this.scale.width / zoom;
         const viewHeight = this.scale.height / zoom;
@@ -543,6 +657,12 @@ export class Volcano extends Phaser.Scene {
     }
 
     update(time, delta) {
+        if (this.playersFrozen) {
+            // Stop movement during countdown
+            if (this.player1 && this.player1.body) this.player1.body.setVelocity(0, 0);
+            if (this.player2 && this.player2.body) this.player2.body.setVelocity(0, 0);
+            return;
+        }
         const dt = delta / 1000;
         
         // HARDCODED: Update orb boost timers
@@ -653,18 +773,30 @@ export class Volcano extends Phaser.Scene {
         const height = this.scale.height;
         const zoom = this.cameras.main ? (this.cameras.main.zoom || 1) : 1;
         
-        // Get original dimensions of the image
+        // Calculate the world dimensions that are currently visible
+        const visibleWorldWidth = width / zoom;
+        const visibleWorldHeight = height / zoom;
+        
+        // Get original dimensions of the image (396x224)
         const bgWidth = this.volcanoBackground.width;
         const bgHeight = this.volcanoBackground.height;
         
-        // Calculate the 'Cover' scale against the screen, compensating for camera zoom
-        const scaleX = width / bgWidth;
-        const scaleY = height / bgHeight;
-        const scale = Math.max(scaleX, scaleY) / zoom;
+        // Log required debug info
+        console.log(`Camera viewport size: ${width}x${height}`);
+        console.log(`Background bounds before scaling: ${bgWidth}x${bgHeight}`);
         
-        // Apply scale and center on the screen
+        // Calculate the 'Cover' scale against the VISIBLE WORLD area
+        const scaleX = visibleWorldWidth / bgWidth;
+        const scaleY = visibleWorldHeight / bgHeight;
+        const scale = Math.max(scaleX, scaleY);
+        
+        console.log(`Background scale applied: ${scale}`);
+        
+        // Apply scale
         this.volcanoBackground.setScale(scale);
-        this.volcanoBackground.setPosition(width / 2, height / 2);
+        
+        // Center the background in the world (where the gameplay is)
+        this.volcanoBackground.setPosition(this.cameras.main.centerX, this.cameras.main.centerY);
     }
     
     updateLavaOrbs(dt) {
@@ -688,8 +820,9 @@ export class Volcano extends Phaser.Scene {
                     orb.disabledIndicator = this.add.text(orb.x, orb.y, '✕', {
                         fontSize: '30px',
                         fill: '#666666',
-                        fontStyle: 'bold'
-                    }).setOrigin(0.5, 0.5).setDepth(5000);
+                        fontStyle: 'bold',
+                        resolution: 2
+                    }).setOrigin(0.5, 0.5).setDepth(10000);
                 }
                 
                 if (orb.cooldownTimer >= orb.cooldownTime) {
@@ -742,8 +875,9 @@ export class Volcano extends Phaser.Scene {
                         fontSize: '30px',
                         fill: '#666666',
                         fontStyle: 'bold',
+                        resolution: 2,
                         alpha: 1.0 - chargeProgress // Fade out as it charges
-                    }).setOrigin(0.5, 0.5).setDepth(5000);
+                    }).setOrigin(0.5, 0.5).setDepth(10000);
                 } else {
                     orb.disabledIndicator.setAlpha(1.0 - chargeProgress);
                 }
@@ -899,8 +1033,15 @@ export class Volcano extends Phaser.Scene {
             if (platform.playersOnPlatform.size > 0 && !platform.isFalling) {
                 platform.fallTimer += dt;
                 
+                // Intense Shake Effect (Level 5 Danger)
+                platform.x = platform.originalX + (Math.random() - 0.5) * 4;
+                platform.y = platform.originalY + (Math.random() - 0.5) * 4;
+                
                 if (platform.fallTimer > 0.5) {
-                    platform.setFillStyle(0xFF0000);
+                    platform.setTint(0xFF0000); // Warning tint
+                    // Faster shake
+                    platform.x = platform.originalX + (Math.random() - 0.5) * 8;
+                    platform.y = platform.originalY + (Math.random() - 0.5) * 8;
                 }
                 
                 if (platform.fallTimer >= 1.0 && !platform.isFalling) {
@@ -929,11 +1070,14 @@ export class Volcano extends Phaser.Scene {
                     // Static bodies can't be disabled, but we've already removed colliders
                     // Store fall velocity for manual animation
                     platform.fallVelocity = 0;
-                    platform.setFillStyle(0x8B0000);
+                    platform.setTint(0x8B0000); // Falling tint
                 }
             } else if (platform.playersOnPlatform.size === 0 && platform.fallTimer > 0) {
                 platform.fallTimer = 0;
-                platform.setFillStyle(0xFF6347);
+                platform.clearTint();
+                // Reset position after shaking
+                platform.x = platform.originalX;
+                platform.y = platform.originalY;
             }
         });
     }
@@ -1109,15 +1253,16 @@ export class Volcano extends Phaser.Scene {
         }
         const sequenceText = this.orbSequenceNumerals.join(' → ');
         const lore = 'The lava orbs whisper an order.\nFollow the Roman numerals:\n' + sequenceText;
-        this.orbSequenceText = this.add.text(914, 260, lore, {
+        this.orbSequenceText = this.add.text(640, 200, lore, {
             fontSize: '20px',
             fill: '#FFFFFF',
             fontStyle: 'bold',
             align: 'center',
             stroke: '#000000',
             strokeThickness: 4,
-            wordWrap: { width: 900 }
-        }).setOrigin(0.5, 0.5).setDepth(5000);
+            wordWrap: { width: 900 },
+            resolution: 2
+        }).setOrigin(0.5, 0.5).setDepth(10000);
     }
     
     updateOrbSequence(dt) {
@@ -1160,15 +1305,16 @@ export class Volcano extends Phaser.Scene {
                             if (this.orbSequenceText) {
                                 this.orbSequenceText.setText(this.orbSequenceText.text + extra);
                             } else {
-                                this.orbSequenceText = this.add.text(914, 260, winnerName + ' mastered the orbs (+3 influence/sec).', {
+                                this.orbSequenceText = this.add.text(640, 200, winnerName + ' mastered the orbs (+3 influence/sec).', {
                                     fontSize: '24px',
                                     fill: '#FFFFFF',
                                     fontStyle: 'bold',
                                     align: 'center',
                                     stroke: '#000000',
                                     strokeThickness: 4,
-                                    wordWrap: { width: 900 }
-                                }).setOrigin(0.5, 0.5).setDepth(5000);
+                                    wordWrap: { width: 900 },
+                                    resolution: 2
+                                }).setOrigin(0.5, 0.5).setDepth(10000);
                             }
                             break;
                         }
@@ -1291,8 +1437,8 @@ export class Volcano extends Phaser.Scene {
                     this.lava.setDepth(999);
                 } else {
                     // HARDCODED: Create lava if it doesn't exist (fallback)
-                    const lavaStartY = this.HARDCODED_GROUND_TOP || 914;
-                    this.lava = this.add.rectangle(914, lavaStartY, 2000, 0, 0xFF4500);
+                    const lavaStartY = this.HARDCODED_GROUND_TOP || 640;
+                    this.lava = this.add.rectangle(640, lavaStartY, 2000, 0, 0xFF4500);
                     this.lava.setOrigin(0.5, 1.0); // Origin at bottom
                     this.lava.setDepth(999);
                     this.lava.setAlpha(1.0);
@@ -1393,18 +1539,18 @@ export class Volcano extends Phaser.Scene {
             const easedProgress = 1 - Math.pow(1 - progress, 8);
             
             // HARDCODED: Calculate lava height (fills from bottom like water)
-            // Ground is at y=914, topmost platform is at y=150 (top at y=135)
-            // Lava should rise to just below top platform: 914 - 135 = 779 pixels
-            const maxLavaHeight = 779; // From ground (914) to just below top platform (135) = 779px
+            // Ground is at y=640, topmost platform is at y=100 (top at y=90)
+            // Lava should rise to just below top platform: 640 - 90 = 550 pixels
+            const maxLavaHeight = 550; // From ground (640) to just below top platform (90) = 550px
             const currentLavaHeight = maxLavaHeight * easedProgress;
-            this.lavaCurrentY = this.lavaStartY; // Keep bottom at ground level (914) - NEVER MOVES
+            this.lavaCurrentY = this.lavaStartY; // Keep bottom at ground level (640) - NEVER MOVES
             
             // HARDCODED: Update lava height (fills from bottom like water)
             if (this.lava) {
                 // CRITICAL: Bottom stays at ground level, height increases upward
                 // Make sure the rectangle actually grows from the bottom
                 this.lava.height = currentLavaHeight; // Grow height upward from bottom
-                this.lava.y = this.lavaStartY; // Bottom always at ground level (914) - NEVER MOVES
+                this.lava.y = this.lavaStartY; // Bottom always at ground level (640) - NEVER MOVES
                 this.lava.setVisible(true);
                 this.lava.setAlpha(1.0);
                 this.lava.setDepth(999);
@@ -1414,8 +1560,8 @@ export class Volcano extends Phaser.Scene {
                 console.error('LAVA OBJECT MISSING DURING RISE!');
                 // HARDCODED: Try to recreate lava if it's missing
                 if (!this.lava) {
-                    const lavaStartY = this.HARDCODED_GROUND_TOP || 914;
-                    this.lava = this.add.rectangle(914, lavaStartY, 1828, 0, 0xFF4500);
+                    const lavaStartY = this.HARDCODED_GROUND_TOP || 640;
+                    this.lava = this.add.rectangle(640, lavaStartY, 2000, 0, 0xFF4500);
                     this.lava.setOrigin(0.5, 1.0); // Origin at bottom center
                     this.lava.setDepth(999);
                     this.lava.setAlpha(1.0);
@@ -1509,13 +1655,14 @@ export class Volcano extends Phaser.Scene {
         if (this.lavaMessageText) {
             this.lavaMessageText.destroy();
         }
-        this.lavaMessageText = this.add.text(914, 360, text, {
+        this.lavaMessageText = this.add.text(640, 300, text, {
             fontSize: '48px',
             fill: '#FFFFFF',
             fontStyle: 'bold',
             stroke: '#000000',
-            strokeThickness: 6
-        }).setOrigin(0.5, 0.5).setDepth(5000);
+            strokeThickness: 6,
+            resolution: 2
+        }).setOrigin(0.5, 0.5).setDepth(10000);
         
         // Remove message after 3 seconds
         this.time.delayedCall(3000, () => {
@@ -1567,12 +1714,12 @@ export class Volcano extends Phaser.Scene {
     
     returnPlayersToStart() {
         // HARDCODED: Return both players to their start positions ABOVE the ground
-        // Ground top is 914, player half height is 35.5
-        // Player should be at: 914 - 35.5 = 878.5 (ABOVE ground, not inside)
+        // Ground top is 640, player half height is 35.5
+        // Player should be at: 640 - 35.5 = 604.5 (ABOVE ground, not inside)
         const player1StartX = 400;
-        const player1StartY = this.HARDCODED_GROUND_TOP - this.HARDCODED_PLAYER_HALF_HEIGHT; // 914 - 35.5 = 878.5
-        const player2StartX = 1428;
-        const player2StartY = this.HARDCODED_GROUND_TOP - this.HARDCODED_PLAYER_HALF_HEIGHT; // 914 - 35.5 = 878.5
+        const player1StartY = this.HARDCODED_GROUND_TOP - this.HARDCODED_PLAYER_HALF_HEIGHT; 
+        const player2StartX = 880;
+        const player2StartY = this.HARDCODED_GROUND_TOP - this.HARDCODED_PLAYER_HALF_HEIGHT; 
         
         // HARDCODED: Reset player positions and velocities - DISABLE physics temporarily
         if (this.player1) {
@@ -1682,13 +1829,13 @@ export class Volcano extends Phaser.Scene {
             }
             
             if (!this.scalesActive) {
-                plate.body.setFillStyle(0x0066CC);
+                plate.body.setTint(0x0066CC);
             } else if (activePlayer === 'Solari') {
-                plate.body.setFillStyle(0xFFD700);
+                plate.body.setTint(0xFFD700);
             } else if (activePlayer === 'Umbrae') {
-                plate.body.setFillStyle(0x8B00FF);
+                plate.body.setTint(0x8B00FF);
             } else {
-                plate.body.setFillStyle(0x0066CC);
+                plate.body.setTint(0x0066CC);
             }
         });
         
@@ -1795,8 +1942,18 @@ export class Volcano extends Phaser.Scene {
     
     endLevel(winner) {
         const winnerText = winner 
-            ? this.add.text(914, 514, `${winner} WINS!`, { fontSize: '68px', fill: winner === 'Solari' ? '#FFD700' : '#8B00FF', fontStyle: 'bold' }).setOrigin(0.5, 0.5)
-            : this.add.text(914, 514, 'NO RESULT', { fontSize: '68px', fill: '#888888', fontStyle: 'bold' }).setOrigin(0.5, 0.5);
+            ? this.add.text(640, 360, `${winner} WINS!`, { 
+                fontSize: '68px', 
+                fill: winner === 'Solari' ? '#FFD700' : '#8B00FF', 
+                fontStyle: 'bold',
+                resolution: 2 
+            }).setOrigin(0.5, 0.5).setDepth(10000)
+            : this.add.text(640, 360, 'NO RESULT', { 
+                fontSize: '68px', 
+                fill: '#888888', 
+                fontStyle: 'bold',
+                resolution: 2 
+            }).setOrigin(0.5, 0.5).setDepth(10000);
         this.scene.pause();
     }
     
