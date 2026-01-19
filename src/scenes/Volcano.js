@@ -128,7 +128,7 @@ export class Volcano extends Phaser.Scene {
             { x: 640, y: 420 },   // Center gap crosser
             { x: 400, y: 280 },   // Upper left path
             { x: 880, y: 280 },   // Upper right path
-            { x: 640, y: 150 },   // Final summit boost
+            { x: 1120, y: 700 },   // Final summit boost
         ];
         
         orbPositions.forEach((pos, index) => {
@@ -402,12 +402,11 @@ export class Volcano extends Phaser.Scene {
             
             // Tier 2 (Mid-Low)
             { x: 1837, y: 250, w: 120, h: 20, falling: true },
-            { x: 640, y: 400, w: 150, h: 20, falling: false }, // Drum platform
             
             // Tier 3 (Mid-High)
             { x: 1030, y: 350, w: 100, h: 20, falling: false },
             { x: 500, y: 300, w: 120, h: 20, falling: true },
-            { x: 780, y: 300, w: 120, h: 20, falling: true },
+            { x: 1350, y: 725, w: 120, h: 20, falling: true },
             
             // Tier 4 (High)
             { x: 640, y: 220, w: 180, h: 20, falling: false },
@@ -419,18 +418,23 @@ export class Volcano extends Phaser.Scene {
 
             // Additional Manual Platforms (Move these manually)
             { x: 200, y: 850, w: 120, h: 20, falling: false },
-            { x: 1080, y: 850, w: 120, h: 20, falling: false },
+            { x: 1120, y: 830, w: 120, h: 20, falling: false },
             { x: 300, y: 650, w: 120, h: 20, falling: false },
-            { x: 980, y: 650, w: 120, h: 20, falling: false },
-            { x: 150, y: 450, w: 120, h: 20, falling: false },
+            { x: 980, y: 550, w: 120, h: 20, falling: false },
+            { x: 1280, y: 550, w: 120, h: 20, falling: false },
             { x: 1130, y: 450, w: 310, h: 20, falling: false },
             { x: 500, y: 200, w: 120, h: 20, falling: false },
             { x: 780, y: 200, w: 120, h: 20, falling: false },
+
+            // DRUM STEEL PLATE PLATFORMS (Move these manually)
+            { x: 1500, y: 600, w: 150, h: 20, falling: false, isDrum: true },
+            { x: 1700, y: 530, w: 150, h: 20, falling: false, isDrum: true },
+            { x: 2100, y: 200, w: 150, h: 20, falling: false, isDrum: true },
         ];
         
         platformData.forEach((data) => {
             let platform;
-            const isDrum = (data.x === 400 && data.y === 750) || (data.x === 1080 && data.y === 550) || (data.x === 640 && data.y === 400);
+            const isDrum = data.isDrum || false;
             
             if (data.falling) {
                 // Falling platforms use the new unstable fiery magma texture
@@ -509,11 +513,9 @@ export class Volcano extends Phaser.Scene {
         
         // ===== DRUM PLATES (Mechanic) =====
         // Connect the mechanics to the new platform positions
-        const drumPlateTargets = [
-            { x: 400, y: 750 },
-            { x: 640, y: 400 },
-            { x: 1080, y: 550 }
-        ];
+        const drumPlateTargets = platformData
+            .filter(d => d.isDrum)
+            .map(d => ({ x: d.x, y: d.y }));
         
         this.scales = [];
         drumPlateTargets.forEach((pos, index) => {
