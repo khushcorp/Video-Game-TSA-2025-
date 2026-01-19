@@ -123,8 +123,8 @@ export class Volcano extends Phaser.Scene {
         // ===== LAVA JUMP ORBS (Strategic placement) =====
         this.lavaOrbs = [];
         const orbPositions = [
-            { x: 250, y: 500 },   // Left ascent start
-            { x: 1030, y: 500 },  // Right ascent start
+            { x: 1550, y:  350},   // Left ascent start
+            { x: 1500, y: 600 },  // Right ascent start
             { x: 640, y: 420 },   // Center gap crosser
             { x: 400, y: 280 },   // Upper left path
             { x: 880, y: 280 },   // Upper right path
@@ -401,12 +401,10 @@ export class Volcano extends Phaser.Scene {
             { x: 1975, y: 630, w: 225, h: 20, falling: false }, // Central start
             
             // Tier 2 (Mid-Low)
-            { x: 1200, y: 550, w: 120, h: 20, falling: true },
-            { x: 880, y: 450, w: 120, h: 20, falling: true },
+            { x: 1837, y: 250, w: 120, h: 20, falling: true },
             { x: 640, y: 400, w: 150, h: 20, falling: false }, // Drum platform
             
             // Tier 3 (Mid-High)
-            { x: 250, y: 350, w: 100, h: 20, falling: false },
             { x: 1030, y: 350, w: 100, h: 20, falling: false },
             { x: 500, y: 300, w: 120, h: 20, falling: true },
             { x: 780, y: 300, w: 120, h: 20, falling: true },
@@ -425,7 +423,7 @@ export class Volcano extends Phaser.Scene {
             { x: 300, y: 650, w: 120, h: 20, falling: false },
             { x: 980, y: 650, w: 120, h: 20, falling: false },
             { x: 150, y: 450, w: 120, h: 20, falling: false },
-            { x: 1130, y: 450, w: 120, h: 20, falling: false },
+            { x: 1130, y: 450, w: 310, h: 20, falling: false },
             { x: 500, y: 200, w: 120, h: 20, falling: false },
             { x: 780, y: 200, w: 120, h: 20, falling: false },
         ];
@@ -497,11 +495,17 @@ export class Volcano extends Phaser.Scene {
             this.textures.get('ladder-pixel').setFilter(Phaser.Textures.FilterMode.NEAREST);
         }
 
-        const leftLadder = this.add.tileSprite(100, 400, 32, 480, 'ladder-pixel').setOrigin(0.5, 0.5);
-        this.vines.push(leftLadder);
-        
-        const rightLadder = this.add.tileSprite(1180, 400, 32, 480, 'ladder-pixel').setOrigin(0.5, 0.5);
-        this.vines.push(rightLadder);
+        const ladderData = [
+            { x: 100, y: 400, w: 32, h: 480 },
+            { x: 2072, y: 414, w: 32, h: 410 },
+            { x: 640, y: 600, w: 32, h: 200 },
+            { x: 1837, y: 93, w: 32, h: 300 }
+        ];
+
+        ladderData.forEach(data => {
+            const ladder = this.add.tileSprite(data.x, data.y, data.w, data.h, 'ladder-pixel').setOrigin(0.5, 0.5);
+            this.vines.push(ladder);
+        });
         
         // ===== DRUM PLATES (Mechanic) =====
         // Connect the mechanics to the new platform positions
