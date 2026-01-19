@@ -14,49 +14,57 @@ export class Start extends Phaser.Scene {
             const vineCanvas = this.textures.createCanvas('vine-pixel', 32, 32);
             const ctx = vineCanvas.context;
 
-            // Base stem (twisted look)
+            // Base stem (Twisted/Curved look)
             ctx.fillStyle = '#1B3D0A'; // Darker green for depth
-            ctx.fillRect(12, 0, 8, 32);
+            // Create a curved shape using multiple rectangles
+            ctx.fillRect(12, 0, 8, 8);
+            ctx.fillRect(14, 8, 8, 8);
+            ctx.fillRect(16, 16, 8, 8);
+            ctx.fillRect(14, 24, 8, 8);
             
-            // Stem detail/shadow
+            // Stem detail/shadow (matching the curve)
             ctx.fillStyle = '#0F2405';
-            ctx.fillRect(12, 0, 3, 32);
+            ctx.fillRect(12, 0, 3, 8);
+            ctx.fillRect(14, 8, 3, 8);
+            ctx.fillRect(16, 16, 3, 8);
+            ctx.fillRect(14, 24, 3, 8);
             
-            // Thorns/Little branches
+            // Thorns/Little branches - Adjusted for curve
             ctx.fillStyle = '#3D6B1F';
-            ctx.fillRect(10, 8, 2, 2);
-            ctx.fillRect(20, 18, 2, 2);
-            ctx.fillRect(10, 28, 2, 2);
+            ctx.fillRect(10, 4, 2, 2);
+            ctx.fillRect(22, 12, 2, 2);
+            ctx.fillRect(24, 20, 2, 2);
+            ctx.fillRect(12, 28, 2, 2);
 
-            // Large Leaves (Pixel Art Style)
+            // Large Leaves (Pixel Art Style) - Adjusted positions for twisted stem
             ctx.fillStyle = '#2D5016'; // Main leaf color
             
-            // Leaf 1 (Left)
-            ctx.fillRect(4, 4, 8, 6);
-            ctx.fillRect(6, 2, 4, 2);
-            ctx.fillRect(6, 10, 4, 2);
+            // Leaf 1 (Left side, top)
+            ctx.fillRect(4, 2, 8, 6);
+            ctx.fillRect(6, 0, 4, 2);
+            ctx.fillRect(6, 8, 4, 2);
             
-            // Leaf 2 (Right)
-            ctx.fillRect(20, 14, 8, 6);
-            ctx.fillRect(22, 12, 4, 2);
-            ctx.fillRect(22, 20, 4, 2);
+            // Leaf 2 (Right side, middle)
+            ctx.fillRect(24, 14, 8, 6);
+            ctx.fillRect(26, 12, 4, 2);
+            ctx.fillRect(26, 20, 4, 2);
             
-            // Leaf 3 (Left)
-            ctx.fillRect(4, 24, 8, 6);
-            ctx.fillRect(6, 22, 4, 2);
-            ctx.fillRect(6, 30, 4, 2);
+            // Leaf 3 (Left side, bottom)
+            ctx.fillRect(6, 24, 8, 6);
+            ctx.fillRect(8, 22, 4, 2);
+            ctx.fillRect(8, 30, 4, 2);
 
             // Highlights
             ctx.fillStyle = '#4A8C2D';
-            ctx.fillRect(6, 5, 3, 2);
-            ctx.fillRect(22, 15, 3, 2);
-            ctx.fillRect(6, 25, 3, 2);
+            ctx.fillRect(6, 3, 3, 2);
+            ctx.fillRect(26, 15, 3, 2);
+            ctx.fillRect(8, 25, 3, 2);
             
-            // Tiny glowy bits/flowers for "Really Cool" effect
+            // Tiny glowy bits/flowers
             ctx.fillStyle = '#89B84C';
-            ctx.fillRect(10, 6, 2, 2);
-            ctx.fillRect(20, 16, 2, 2);
-            ctx.fillRect(10, 26, 2, 2);
+            ctx.fillRect(10, 4, 2, 2);
+            ctx.fillRect(24, 16, 2, 2);
+            ctx.fillRect(12, 26, 2, 2);
 
             vineCanvas.refresh();
         }
@@ -108,6 +116,95 @@ export class Start extends Phaser.Scene {
             ctx.fillRect(33, 20, 4, 4);
 
             totemCanvas.refresh();
+        }
+
+        // ===== PILLAR & RUNE TEXTURES =====
+        const runeColors = ['#FFD700', '#00FFFF', '#FF4500']; // Left (Gold), Middle (Cyan), Right (Orange-Red)
+        
+        for (let i = 1; i <= 3; i++) {
+            const pKey = `pillar-pixel-${i}`;
+            const rKey = `rune-pixel-${i}`;
+            const color = runeColors[i-1];
+
+            // 1. Pillar Texture
+            if (!this.textures.exists(pKey)) {
+                const canvas = this.textures.createCanvas(pKey, 80, 100);
+                const ctx = canvas.context;
+                
+                // Base Stone
+                ctx.fillStyle = '#4A4A4A';
+                ctx.fillRect(0, 0, 80, 100);
+                
+                // Stone Shading/Noise (Re-applied as requested)
+                ctx.fillStyle = '#3A3A3A';
+                for(let j=0; j<100; j++) {
+                    ctx.fillRect(Math.random()*80, Math.random()*100, 4, 4);
+                }
+                
+                // Decorative Carvings (Matches Rune Color)
+                ctx.strokeStyle = color;
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                if (i === 1) { // Left: Geometric
+                    ctx.moveTo(20, 20); ctx.lineTo(60, 20); ctx.lineTo(40, 80); ctx.closePath();
+                    ctx.moveTo(20, 40); ctx.lineTo(60, 40);
+                } else if (i === 2) { // Middle: Solar/Circle
+                    ctx.arc(40, 50, 25, 0, Math.PI * 2);
+                    ctx.moveTo(40, 25); ctx.lineTo(40, 75);
+                    ctx.moveTo(15, 50); ctx.lineTo(65, 50);
+                } else { // Right: Runic/Z-shape
+                    ctx.moveTo(20, 20); ctx.lineTo(60, 20); ctx.lineTo(20, 80); ctx.lineTo(60, 80);
+                }
+                ctx.stroke();
+                
+                // Vines
+                ctx.strokeStyle = '#1B3D0A';
+                ctx.lineWidth = 4;
+                ctx.beginPath();
+                ctx.moveTo(0, 90); ctx.bezierCurveTo(40, 70, 40, 30, 80, 10);
+                ctx.stroke();
+                ctx.fillStyle = '#2D5016';
+                for(let v=0; v<5; v++) ctx.fillRect(10 + v*12, 80 - v*15, 8, 6);
+                
+                canvas.refresh();
+            }
+
+            // 2. Rune Texture (Distinct for each pillar)
+            if (!this.textures.exists(rKey)) {
+                const canvas = this.textures.createCanvas(rKey, 40, 40);
+                const ctx = canvas.context;
+                
+                // Circular Stone Base
+                ctx.fillStyle = '#5D2906';
+                ctx.beginPath(); ctx.arc(20, 20, 18, 0, Math.PI * 2); ctx.fill();
+                
+                // Shading
+                ctx.fillStyle = '#3D1F1F';
+                ctx.beginPath(); ctx.arc(20, 20, 18, 0, Math.PI); ctx.fill();
+                
+                // Inner Glow Base
+                ctx.fillStyle = '#8B4513';
+                ctx.beginPath(); ctx.arc(20, 20, 14, 0, Math.PI * 2); ctx.fill();
+                
+                // Runic Symbol (Carved - Matches Pillar Symbol Shape and Color)
+                ctx.strokeStyle = color;
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                if (i === 1) { // Geometric
+                    ctx.moveTo(15, 12); ctx.lineTo(25, 12); ctx.lineTo(20, 28); ctx.closePath();
+                    // Add the missing middle line to match the pillar symbol
+                    ctx.moveTo(15, 18); ctx.lineTo(25, 18);
+                } else if (i === 2) { // Solar
+                    ctx.arc(20, 20, 10, 0, Math.PI * 2);
+                    ctx.moveTo(20, 10); ctx.lineTo(20, 30);
+                    ctx.moveTo(10, 20); ctx.lineTo(30, 20);
+                } else { // Z-shape
+                    ctx.moveTo(12, 12); ctx.lineTo(28, 12); ctx.lineTo(12, 28); ctx.lineTo(28, 28);
+                }
+                ctx.stroke();
+                
+                canvas.refresh();
+            }
         }
 
         // ===== LEVEL SETUP =====
@@ -506,11 +603,10 @@ export class Start extends Phaser.Scene {
         ];
         
         pillarPositions.forEach((pos, index) => {
-            // Large, visible pillar
-            const pillar = this.add.rectangle(pos.x, pos.y, 80, 100, 0x5a5a5a);
+            // Large, visible pillar (Now using Pixel Art)
+            const pillar = this.add.sprite(pos.x, pos.y, `pillar-pixel-${index + 1}`);
             pillar.setOrigin(0.5, 0.5);
-            pillar.setStrokeStyle(4, 0xaaaaaa);
-            pillar.setDepth(15); // Make sure it's visible
+            pillar.setDepth(15); 
             pillar.pillarIndex = index;
             pillar.hasRune = false;
             pillar.owner = null;
@@ -528,8 +624,7 @@ export class Start extends Phaser.Scene {
         this.runes = [];
         
         // Left rune - on left vine top platform (requires W+D to reach)
-        const leftRune = this.add.circle(130, 75, 20, 0x8B4513); // Brown/tan rune
-        leftRune.setStrokeStyle(2, 0xFFD700); // Gold border
+        const leftRune = this.add.sprite(130, 75, 'rune-pixel-1');
         leftRune.setOrigin(0.5, 0.5);
         leftRune.runeIndex = 0;
         leftRune.collected = false;
@@ -538,24 +633,22 @@ export class Start extends Phaser.Scene {
         this.runes.push(leftRune); // runes[0] = left pillar (index 0)
         
         // Middle rune - spawns randomly after 25 seconds
-        const middleRune = this.add.circle(640, 75, 20, 0x8B4513); // Brown/tan rune
-        middleRune.setStrokeStyle(2, 0xFFD700); // Gold border
+        const middleRune = this.add.sprite(640, 75, 'rune-pixel-2');
         middleRune.setOrigin(0.5, 0.5);
         middleRune.runeIndex = 1;
         middleRune.collected = false;
-        middleRune.glow = this.add.circle(640, 75, 25, 0xFFD700, 0.3);
+        middleRune.glow = this.add.circle(640, 75, 25, 0x00FFFF, 0.3); // Matching cyan glow
         middleRune.glow.setOrigin(0.5, 0.5);
         middleRune.setVisible(false); // Start hidden
         middleRune.glow.setVisible(false);
         this.runes.push(middleRune); // runes[1] = middle pillar (index 1)
         
         // Right rune - on right vine top platform (requires Up+Right to reach)
-        const rightRune = this.add.circle(1150, 75, 20, 0x8B4513); // Brown/tan rune
-        rightRune.setStrokeStyle(2, 0xFFD700); // Gold border
+        const rightRune = this.add.sprite(1150, 75, 'rune-pixel-3');
         rightRune.setOrigin(0.5, 0.5);
         rightRune.runeIndex = 2;
         rightRune.collected = false;
-        rightRune.glow = this.add.circle(1150, 75, 25, 0xFFD700, 0.3);
+        rightRune.glow = this.add.circle(1150, 75, 25, 0xFF4500, 0.3); // Matching orange glow
         rightRune.glow.setOrigin(0.5, 0.5);
         this.runes.push(rightRune); // runes[2] = right pillar (index 2)
         
@@ -808,7 +901,7 @@ export class Start extends Phaser.Scene {
     createWindTotemDial() {
         // Create Wind Totem (Pixel Art Sprite)
         // Platform top is at 55 (70 - 15), totem is 50px high, so y=30 puts it on top
-        this.windTotem = this.add.sprite(640, 30, 'totem-pixel');
+        this.windTotem = this.add.sprite(640, 35, 'totem-pixel');
         this.windTotem.setOrigin(0.5, 0.5);
         
         // Totem state
@@ -1573,10 +1666,10 @@ export class Start extends Phaser.Scene {
             const p1Near = Phaser.Math.Distance.Between(this.player1.x, this.player1.y, pillar.x, pillar.y) < distanceThreshold;
             const p2Near = Phaser.Math.Distance.Between(this.player2.x, this.player2.y, pillar.x, pillar.y) < distanceThreshold;
             
-            // Player 1 places rune - ANY rune can be placed in ANY pillar
+            // Player 1 places rune - ONLY if it matches the pillar index
             if (p1Near && this.player1.carriedRune !== null) {
                 const wPressed = Phaser.Input.Keyboard.JustDown(this.wKey);
-                if (wPressed) {
+                if (wPressed && this.player1.carriedRune === index) {
                     // Hide the rune that was placed
                     const placedRuneIndex = this.player1.carriedRune;
                     const placedRune = this.runes[placedRuneIndex];
@@ -1589,8 +1682,13 @@ export class Start extends Phaser.Scene {
                     // Place rune in pillar
                     pillar.hasRune = true;
                     pillar.owner = this.player1.faction;
-                    pillar.setFillStyle(0xFFD700); // Gold for Solari
-                    pillar.glow.setFillStyle(0xFFD700);
+                    
+                    // Set color based on the rune/pillar index (Gold, Cyan, or Orange-Red)
+                    const runeColors = [0xFFD700, 0x00FFFF, 0xFF4500];
+                    const targetColor = runeColors[index];
+                    
+                    pillar.setTint(targetColor); 
+                    pillar.glow.setFillStyle(targetColor);
                     pillar.glow.setAlpha(0.6);
                     this.player1.carriedRune = null;
                     
@@ -1599,14 +1697,14 @@ export class Start extends Phaser.Scene {
                         this.middleRuneSpawned = false;
                         this.middleRuneSpawnTimer = 25;
                         this.middleRuneTimerText.setVisible(true);
-                }
+                    }
                 }
             }
             
-            // Player 2 places rune - ANY rune can be placed in ANY pillar
+            // Player 2 places rune - ONLY if it matches the pillar index
             if (p2Near && this.player2.carriedRune !== null) {
                 const upPressed = Phaser.Input.Keyboard.JustDown(this.upKey);
-                if (upPressed) {
+                if (upPressed && this.player2.carriedRune === index) {
                     // Hide the rune that was placed
                     const placedRuneIndex = this.player2.carriedRune;
                     const placedRune = this.runes[placedRuneIndex];
@@ -1619,8 +1717,13 @@ export class Start extends Phaser.Scene {
                     // Place rune in pillar
                     pillar.hasRune = true;
                     pillar.owner = this.player2.faction;
-                    pillar.setFillStyle(0x8B00FF); // Purple for Umbrae
-                    pillar.glow.setFillStyle(0x8B00FF);
+                    
+                    // Set color based on the rune/pillar index (Gold, Cyan, or Orange-Red)
+                    const runeColors = [0xFFD700, 0x00FFFF, 0xFF4500];
+                    const targetColor = runeColors[index];
+                    
+                    pillar.setTint(targetColor); 
+                    pillar.glow.setFillStyle(targetColor);
                     pillar.glow.setAlpha(0.6);
                     this.player2.carriedRune = null;
                     
@@ -1633,8 +1736,8 @@ export class Start extends Phaser.Scene {
                 }
             }
             
-            // Visual feedback - show glow when player is near with ANY rune
-            if ((p1Near && this.player1.carriedRune !== null) || (p2Near && this.player2.carriedRune !== null)) {
+            // Visual feedback - show glow when player is near with the CORRECT rune
+            if ((p1Near && this.player1.carriedRune === index) || (p2Near && this.player2.carriedRune === index)) {
                 pillar.glow.setAlpha(0.4);
                 pillar.glow.setFillStyle(0xffff00); // Yellow hint
             } else if (!pillar.hasRune) {

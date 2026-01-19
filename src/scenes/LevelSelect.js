@@ -10,49 +10,57 @@ export class LevelSelect extends Phaser.Scene {
             const vineCanvas = this.textures.createCanvas('vine-pixel', 32, 32);
             const ctx = vineCanvas.context;
 
-            // Base stem (twisted look)
+            // Base stem (Twisted/Curved look)
             ctx.fillStyle = '#1B3D0A'; // Darker green for depth
-            ctx.fillRect(12, 0, 8, 32);
+            // Create a curved shape using multiple rectangles
+            ctx.fillRect(12, 0, 8, 8);
+            ctx.fillRect(14, 8, 8, 8);
+            ctx.fillRect(16, 16, 8, 8);
+            ctx.fillRect(14, 24, 8, 8);
             
-            // Stem detail/shadow
+            // Stem detail/shadow (matching the curve)
             ctx.fillStyle = '#0F2405';
-            ctx.fillRect(12, 0, 3, 32);
+            ctx.fillRect(12, 0, 3, 8);
+            ctx.fillRect(14, 8, 3, 8);
+            ctx.fillRect(16, 16, 3, 8);
+            ctx.fillRect(14, 24, 3, 8);
             
-            // Thorns/Little branches
+            // Thorns/Little branches - Adjusted for curve
             ctx.fillStyle = '#3D6B1F';
-            ctx.fillRect(10, 8, 2, 2);
-            ctx.fillRect(20, 18, 2, 2);
-            ctx.fillRect(10, 28, 2, 2);
+            ctx.fillRect(10, 4, 2, 2);
+            ctx.fillRect(22, 12, 2, 2);
+            ctx.fillRect(24, 20, 2, 2);
+            ctx.fillRect(12, 28, 2, 2);
 
-            // Large Leaves (Pixel Art Style)
+            // Large Leaves (Pixel Art Style) - Adjusted positions for twisted stem
             ctx.fillStyle = '#2D5016'; // Main leaf color
             
-            // Leaf 1 (Left)
-            ctx.fillRect(4, 4, 8, 6);
-            ctx.fillRect(6, 2, 4, 2);
-            ctx.fillRect(6, 10, 4, 2);
+            // Leaf 1 (Left side, top)
+            ctx.fillRect(4, 2, 8, 6);
+            ctx.fillRect(6, 0, 4, 2);
+            ctx.fillRect(6, 8, 4, 2);
             
-            // Leaf 2 (Right)
-            ctx.fillRect(20, 14, 8, 6);
-            ctx.fillRect(22, 12, 4, 2);
-            ctx.fillRect(22, 20, 4, 2);
+            // Leaf 2 (Right side, middle)
+            ctx.fillRect(24, 14, 8, 6);
+            ctx.fillRect(26, 12, 4, 2);
+            ctx.fillRect(26, 20, 4, 2);
             
-            // Leaf 3 (Left)
-            ctx.fillRect(4, 24, 8, 6);
-            ctx.fillRect(6, 22, 4, 2);
-            ctx.fillRect(6, 30, 4, 2);
+            // Leaf 3 (Left side, bottom)
+            ctx.fillRect(6, 24, 8, 6);
+            ctx.fillRect(8, 22, 4, 2);
+            ctx.fillRect(8, 30, 4, 2);
 
             // Highlights
             ctx.fillStyle = '#4A8C2D';
-            ctx.fillRect(6, 5, 3, 2);
-            ctx.fillRect(22, 15, 3, 2);
-            ctx.fillRect(6, 25, 3, 2);
+            ctx.fillRect(6, 3, 3, 2);
+            ctx.fillRect(26, 15, 3, 2);
+            ctx.fillRect(8, 25, 3, 2);
             
-            // Tiny glowy bits/flowers for "Really Cool" effect
+            // Tiny glowy bits/flowers
             ctx.fillStyle = '#89B84C';
-            ctx.fillRect(10, 6, 2, 2);
-            ctx.fillRect(20, 16, 2, 2);
-            ctx.fillRect(10, 26, 2, 2);
+            ctx.fillRect(10, 4, 2, 2);
+            ctx.fillRect(24, 16, 2, 2);
+            ctx.fillRect(12, 26, 2, 2);
 
             vineCanvas.refresh();
         }

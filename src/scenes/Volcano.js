@@ -64,12 +64,12 @@ export class Volcano extends Phaser.Scene {
         this.lastUmbraeInfluenceInt = 0;
         
         // ===== MOVEMENT SETTINGS =====
-        this.playerSpeed = 286;
+        this.playerSpeed = 200;
         this.jumpVelocity = -550; // Match Level 1 jump power
         this.climbSpeed = 200;
         
         // HARDCODED: Store original values for debuff system
-        this.basePlayerSpeed = 286;
+        this.basePlayerSpeed = 200;
         this.baseJumpVelocity = -550;
         
         // ===== RISING LAVA MECHANIC =====
@@ -372,7 +372,7 @@ export class Volcano extends Phaser.Scene {
         // Logical constants for gameplay (auto-calculated from your values above)
         this.HARDCODED_GROUND_TOP = groundY - (groundHeight / 2);
         this.groundTop = this.HARDCODED_GROUND_TOP;
-        this.HARDCODED_PLAYER_HALF_HEIGHT = 35.5;
+        this.HARDCODED_PLAYER_HALF_HEIGHT = 25;
         this.scalesActive = false;
         this.previousScalesActive = false;
         this.scales = [];
@@ -396,12 +396,12 @@ export class Volcano extends Phaser.Scene {
         // New Parkour Platform Data (Ascent path)
         const platformData = [
             // Tier 1 (Low)
-            { x: 200, y: 550, w: 150, h: 20, falling: false },
-            { x: 1080, y: 550, w: 150, h: 20, falling: false },
-            { x: 640, y: 520, w: 200, h: 20, falling: false }, // Central start
+            { x: 1950, y: 860, w: 150, h: 20, falling: false },
+            { x: 1700, y: 747, w: 150, h: 20, falling: false },
+            { x: 1975, y: 630, w: 225, h: 20, falling: false }, // Central start
             
             // Tier 2 (Mid-Low)
-            { x: 400, y: 450, w: 120, h: 20, falling: true },
+            { x: 1200, y: 550, w: 120, h: 20, falling: true },
             { x: 880, y: 450, w: 120, h: 20, falling: true },
             { x: 640, y: 400, w: 150, h: 20, falling: false }, // Drum platform
             
@@ -418,11 +418,21 @@ export class Volcano extends Phaser.Scene {
             
             // Tier 5 (Peak)
             { x: 640, y: 100, w: 250, h: 20, falling: false },
+
+            // Additional Manual Platforms (Move these manually)
+            { x: 200, y: 850, w: 120, h: 20, falling: false },
+            { x: 1080, y: 850, w: 120, h: 20, falling: false },
+            { x: 300, y: 650, w: 120, h: 20, falling: false },
+            { x: 980, y: 650, w: 120, h: 20, falling: false },
+            { x: 150, y: 450, w: 120, h: 20, falling: false },
+            { x: 1130, y: 450, w: 120, h: 20, falling: false },
+            { x: 500, y: 200, w: 120, h: 20, falling: false },
+            { x: 780, y: 200, w: 120, h: 20, falling: false },
         ];
         
         platformData.forEach((data) => {
             let platform;
-            const isDrum = (data.y === 550 || (data.x === 640 && data.y === 400));
+            const isDrum = (data.x === 400 && data.y === 750) || (data.x === 1080 && data.y === 550) || (data.x === 640 && data.y === 400);
             
             if (data.falling) {
                 // Falling platforms use the new unstable fiery magma texture
@@ -496,7 +506,7 @@ export class Volcano extends Phaser.Scene {
         // ===== DRUM PLATES (Mechanic) =====
         // Connect the mechanics to the new platform positions
         const drumPlateTargets = [
-            { x: 200, y: 550 },
+            { x: 400, y: 750 },
             { x: 640, y: 400 },
             { x: 1080, y: 550 }
         ];
@@ -523,16 +533,17 @@ export class Volcano extends Phaser.Scene {
         this.faultlinePlates = [];
         drumPlateTargets.forEach(target => {
             const plat = this.platforms.find(p => Math.abs(p.x - target.x) < 1 && Math.abs(p.y - target.y) < 1);
-            if (plat) this.faultlinePlates.push({ body: plat });
+            // Push the result even if null to keep array indices matched with drumPlateTargets/scales
+            this.faultlinePlates.push(plat ? { body: plat } : null);
         });
         
         // ===== PLAYERS =====
-        const spawnY = 900; 
+        const spawnY = 910; 
         
-        this.player1 = this.add.rectangle(400, spawnY, 71, 71, 0xFFD700).setOrigin(0.5, 0.5);
+        this.player1 = this.add.rectangle(400, spawnY, 50, 50, 0xFFD700).setOrigin(0.5, 0.5);
         this.physics.add.existing(this.player1);
         // REMOVED setCollideWorldBounds(true) - This was another "invisible barrier" forcing players up
-        this.player1.body.setSize(71, 71).setGravityY(this.gravity);
+        this.player1.body.setSize(50, 50).setGravityY(this.gravity);
         this.player1.setDepth(20).faction = 'Solari';
         this.player1.climbing = false;
         this.player1.onVine = null;
@@ -542,10 +553,10 @@ export class Volcano extends Phaser.Scene {
         this.player1.vineLatchCooldown = 0;
         this.player1.vineClimbSpeed = this.climbSpeed;
         
-        this.player2 = this.add.rectangle(880, spawnY, 71, 71, 0x8B00FF).setOrigin(0.5, 0.5);
+        this.player2 = this.add.rectangle(880, spawnY, 50, 50, 0x8B00FF).setOrigin(0.5, 0.5);
         this.physics.add.existing(this.player2);
         // REMOVED setCollideWorldBounds(true) - This was another "invisible barrier" forcing players up
-        this.player2.body.setSize(71, 71).setGravityY(this.gravity);
+        this.player2.body.setSize(50, 50).setGravityY(this.gravity);
         this.player2.setDepth(20).faction = 'Umbrae';
         this.player2.climbing = false;
         this.player2.onVine = null;
@@ -1758,7 +1769,7 @@ export class Volcano extends Phaser.Scene {
         this.playerSpeed = this.basePlayerSpeed;
         this.jumpVelocity = this.baseJumpVelocity;
         
-        console.log('HARDCODED: Players returned to start positions - Y:', player1StartY, 'Ground top:', this.HARDCODED_GROUND_TOP);
+        console.log('HARDCODED: Players returned to start positions - Y:', spawnY, 'Ground top:', this.HARDCODED_GROUND_TOP);
     }
     
     updateFaultlinePuzzle(dt) {
@@ -1778,6 +1789,7 @@ export class Volcano extends Phaser.Scene {
         
         this.scales.forEach((scale, index) => {
             const plate = this.faultlinePlates[index];
+            if (!plate || !plate.body) return; // Safety check: skip if plate is missing or moved
             
             if (this.scalesActive) {
                 scale.indicator.setText('✔');
