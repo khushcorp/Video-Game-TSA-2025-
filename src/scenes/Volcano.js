@@ -125,9 +125,9 @@ export class Volcano extends Phaser.Scene {
         const orbPositions = [
             { x: 1550, y:  350},   // Left ascent start
             { x: 1500, y: 600 },  // Right ascent start
-            { x: 640, y: 420 },   // Center gap crosser
-            { x: 400, y: 280 },   // Upper left path
-            { x: 880, y: 280 },   // Upper right path
+            { x: 695, y: 620 },   // Center gap crosser
+            { x: 1300, y: 220 },   // Upper left path
+            { x: 429, y: 360 },   // Upper right path
             { x: 1120, y: 700 },   // Final summit boost
         ];
         
@@ -396,40 +396,43 @@ export class Volcano extends Phaser.Scene {
         // New Parkour Platform Data (Ascent path)
         const platformData = [
             // Tier 1 (Low)
-            { x: 1950, y: 860, w: 150, h: 20, falling: false },
+            { x: 1950, y: 830, w: 150, h: 20, falling: false },
             { x: 1700, y: 747, w: 150, h: 20, falling: false },
             { x: 1975, y: 630, w: 225, h: 20, falling: false }, // Central start
             
             // Tier 2 (Mid-Low)
             { x: 1837, y: 250, w: 120, h: 20, falling: true },
+            { x: 1837, y: 250, w: 120, h: 20, falling: true },
+
             
             // Tier 3 (Mid-High)
-            { x: 1030, y: 350, w: 100, h: 20, falling: false },
-            { x: 500, y: 300, w: 120, h: 20, falling: true },
+            { x: 1132, y: 350, w: 130, h: 20, falling: false },
+            { x: 911, y: 725, w: 120, h: 20, falling: true },
             { x: 1350, y: 725, w: 120, h: 20, falling: true },
             
             // Tier 4 (High)
-            { x: 640, y: 220, w: 180, h: 20, falling: false },
-            { x: 350, y: 180, w: 100, h: 20, falling: false },
-            { x: 930, y: 180, w: 100, h: 20, falling: false },
+            { x: 550, y: 200, w: 120, h: 20, falling: false },
             
             // Tier 5 (Peak)
-            { x: 640, y: 100, w: 250, h: 20, falling: false },
+            { x: 150, y: 605, w: 120, h: 20, falling: false },
 
             // Additional Manual Platforms (Move these manually)
-            { x: 200, y: 850, w: 120, h: 20, falling: false },
+            { x: 550, y: 830, w: 120, h: 20, falling: false },
             { x: 1120, y: 830, w: 120, h: 20, falling: false },
-            { x: 300, y: 650, w: 120, h: 20, falling: false },
             { x: 980, y: 550, w: 120, h: 20, falling: false },
             { x: 1280, y: 550, w: 120, h: 20, falling: false },
             { x: 1130, y: 450, w: 310, h: 20, falling: false },
-            { x: 500, y: 200, w: 120, h: 20, falling: false },
-            { x: 780, y: 200, w: 120, h: 20, falling: false },
+            { x: 325, y: 200, w: 120, h: 20, falling: false },
+            { x: 325, y: 725, w: 120, h: 20, falling: true },
+            { x: 850, y: 500, w: 120, h: 20, falling: true },
+            { x: 850, y: 200, w: 120, h: 20, falling: true },
+
+
 
             // DRUM STEEL PLATE PLATFORMS (Move these manually)
-            { x: 1500, y: 600, w: 150, h: 20, falling: false, isDrum: true },
+            { x: 1135, y: 125, w: 150, h: 20, falling: false, isDrum: true },
             { x: 1700, y: 530, w: 150, h: 20, falling: false, isDrum: true },
-            { x: 2100, y: 200, w: 150, h: 20, falling: false, isDrum: true },
+            { x: 425, y: 500, w: 150, h: 20, falling: false, isDrum: true },
         ];
         
         platformData.forEach((data) => {
@@ -500,9 +503,9 @@ export class Volcano extends Phaser.Scene {
         }
 
         const ladderData = [
-            { x: 100, y: 400, w: 32, h: 480 },
+            { x: 105, y: 407, w: 32, h: 380 },
             { x: 2072, y: 414, w: 32, h: 410 },
-            { x: 640, y: 600, w: 32, h: 200 },
+            { x: 320, y: 91, w: 32, h: 200 },
             { x: 1837, y: 93, w: 32, h: 300 }
         ];
 
