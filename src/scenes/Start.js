@@ -1697,7 +1697,7 @@ export class Start extends Phaser.Scene {
                         this.middleRuneSpawned = false;
                         this.middleRuneSpawnTimer = 25;
                         this.middleRuneTimerText.setVisible(true);
-                    }
+                }
                 }
             }
             

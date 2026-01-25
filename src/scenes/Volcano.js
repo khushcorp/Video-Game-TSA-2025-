@@ -41,6 +41,11 @@ export class Volcano extends Phaser.Scene {
         this.player2Influence = 0;
         this.maxInfluence = 500;
         
+        // HARDCODED: Per-second influence rates (stack and persist until next event)
+        // Note: Rates can be negative (losing influence/sec), but actual influence is clamped to >= 0
+        this.player1InfluenceRate = 0;
+        this.player2InfluenceRate = 0;
+        
         const uiPadding = 320;
         this.player1BarBg = this.add.rectangle(uiPadding, 30, 400, 30, 0x333333);
         this.player1BarBg.setOrigin(0.5, 0.5);
@@ -75,8 +80,8 @@ export class Volcano extends Phaser.Scene {
         // ===== RISING LAVA MECHANIC =====
         this.lavaRiseStartTime1 = 20; 
         this.lavaRiseActualStart1 = 30; 
-        this.lavaRiseStartTime2 = 200; 
-        this.lavaRiseActualStart2 = 210; 
+        this.lavaRiseStartTime2 = 80; // 1:30 - 10 seconds warning
+        this.lavaRiseActualStart2 = 90; // 1:30 (90 seconds) 
         this.lavaRiseWarningDuration = 10; 
         this.lavaRiseDuration = 80; 
         this.lavaRiseTimer = 0;
@@ -94,8 +99,8 @@ export class Volcano extends Phaser.Scene {
         this.lavaGlow = null;
         this.lavaParticles = [];
         
-        // Lava warning timer text
-        this.lavaWarningText = this.add.text(1280 / 2, 100, '', {
+        // Lava warning timer text (centered at top)
+        this.lavaWarningText = this.add.text(1280 / 2, 50, '', {
             fontSize: '48px',
             fill: '#FF4500',
             fontStyle: 'bold',
@@ -107,6 +112,12 @@ export class Volcano extends Phaser.Scene {
         // Player debuff flags (for lava damage)
         this.player1LavaDebuff = false;
         this.player2LavaDebuff = false;
+        this.player1FellInLava = false;
+        this.player2FellInLava = false;
+        this.player1Respawned = true;
+        this.player2Respawned = true;
+        // HARDCODED: Freeze players only while lava message is visible
+        this.playersFrozenForLavaMessage = false;
         this.gravity = 600;
         
         // Set physics world gravity
@@ -361,7 +372,7 @@ export class Volcano extends Phaser.Scene {
         const groundX = 900;
         const groundY = 1050;
         const groundWidth = 2690;
-        const groundHeight = 225;
+        const groundHeight = 250;
         
         // Ground using Magma Texture
         const ground = this.add.tileSprite(groundX, groundY, groundWidth, groundHeight, 'magma-platform');
@@ -380,15 +391,16 @@ export class Volcano extends Phaser.Scene {
         this.umbraeScaleCount = 0;
         
         // Create lava (adjusted for new ground)
+        // HARDCODED: Lava depth must be higher than faultline indicators (10000) and roman numerals (10000) to cover them
         this.time.delayedCall(100, () => {
             const lavaStartY = this.HARDCODED_GROUND_TOP; 
             this.lavaStartY = lavaStartY;
             this.lavaCurrentY = lavaStartY;
-            this.lava = this.add.rectangle(1280/2, lavaStartY, 2000, 0, 0xFF4500).setOrigin(0.5, 1.0).setDepth(999).setVisible(false);
-            this.lavaGlow = this.add.rectangle(1280/2, lavaStartY, 2000, 50, 0xFF6347).setOrigin(0.5, 0.5).setDepth(1000).setVisible(false);
+            this.lava = this.add.rectangle(1280/2, lavaStartY, 3500, 0, 0xFF4500).setOrigin(0.5, 1.0).setDepth(10001).setVisible(false);
+            this.lavaGlow = this.add.rectangle(1280/2, lavaStartY, 3500, 50, 0xFF6347).setOrigin(0.5, 0.5).setDepth(10002).setVisible(false);
             this.lavaParticles = [];
             for (let i = 0; i < 20; i++) {
-                const particle = this.add.circle(100 + (i * 60), lavaStartY - 100, 8, 0xFFD700, 1.0).setDepth(1001).setVisible(false);
+                const particle = this.add.circle(100 + (i * 60), lavaStartY - 100, 8, 0xFFD700, 1.0).setDepth(10003).setVisible(false);
                 this.lavaParticles.push(particle);
             }
         });
@@ -547,7 +559,7 @@ export class Volcano extends Phaser.Scene {
         });
         
         // ===== PLAYERS =====
-        const spawnY = 910; 
+        const spawnY = 900; 
         
         this.player1 = this.add.rectangle(400, spawnY, 50, 50, 0xFFD700).setOrigin(0.5, 0.5);
         this.physics.add.existing(this.player1);
@@ -689,6 +701,25 @@ export class Volcano extends Phaser.Scene {
         }
         const dt = delta / 1000;
         
+        // HARDCODED: Freeze players while lava message is visible - keep them locked at spawn position
+        if (this.playersFrozenForLavaMessage) {
+            // Force players to stay at spawn position while message is visible
+            if (this.player1 && this.player1SpawnX !== undefined && this.player1SpawnY !== undefined) {
+                this.player1.x = this.player1SpawnX;
+                this.player1.y = this.player1SpawnY;
+                if (this.player1.body) {
+                    this.player1.body.setVelocity(0, 0);
+                }
+            }
+            if (this.player2 && this.player2SpawnX !== undefined && this.player2SpawnY !== undefined) {
+                this.player2.x = this.player2SpawnX;
+                this.player2.y = this.player2SpawnY;
+                if (this.player2.body) {
+                    this.player2.body.setVelocity(0, 0);
+                }
+            }
+        }
+        
         // HARDCODED: Update orb boost timers
         if (this.player1OrbBoostTimer > 0) {
             this.player1OrbBoostTimer -= dt;
@@ -699,33 +730,44 @@ export class Volcano extends Phaser.Scene {
             if (this.player2OrbBoostTimer < 0) this.player2OrbBoostTimer = 0;
         }
         
-        // HARDCODED: Skip ground correction for 0.5 seconds after lava ends to prevent teleporting into ground
+        // HARDCODED: Skip ground correction if players are frozen for message or for 0.5 seconds after lava ends
         const timeSinceLavaEnd = this.lavaEndTime > 0 ? this.levelTime - this.lavaEndTime : 999;
-        const skipGroundCorrection = this.lavaSurvivalChecked && timeSinceLavaEnd < 0.5;
+        const skipGroundCorrection = this.playersFrozenForLavaMessage || (this.lavaSurvivalChecked && timeSinceLavaEnd < 0.5);
         
         // Only force players to ground position if they're actually on the ground platform
-        // Check if player is near ground level (within 50 pixels of ground top)
+        // HARDCODED: Skip ground correction for players who have fallen into lava
         if (!skipGroundCorrection) {
             const groundTop = this.groundTop;
-            const playerBottom1 = this.player1.y + this.HARDCODED_PLAYER_HALF_HEIGHT;
-            const playerBottom2 = this.player2.y + this.HARDCODED_PLAYER_HALF_HEIGHT;
-            const isOnGround1 = this.player1.body.touching.down && Math.abs(playerBottom1 - groundTop) < 50;
-            const isOnGround2 = this.player2.body.touching.down && Math.abs(playerBottom2 - groundTop) < 50;
             
-            // Only correct position if player is actually on the ground AND not falling
-            // This prevents forcing player into ground when falling from high heights
-            if (isOnGround1 && Math.abs(this.player1.body.velocity.y) < 10 && this.player1OrbBoostTimer === 0) {
-                const expectedY = groundTop - this.HARDCODED_PLAYER_HALF_HEIGHT;
-                // Only correct if player is very close to expected position (within 2 pixels)
-                if (Math.abs(this.player1.y - expectedY) <= 2) {
-                    this.player1.y = expectedY;
+            // Only check player 1 if they haven't fallen into lava
+            if (!this.player1FellInLava && this.player1 && this.player1.body) {
+                const playerBottom1 = this.player1.y + this.HARDCODED_PLAYER_HALF_HEIGHT;
+                const isOnGround1 = this.player1.body.touching.down && Math.abs(playerBottom1 - groundTop) < 50;
+                
+                // Only correct position if player is actually on the ground AND not falling
+                // This prevents forcing player into ground when falling from high heights
+                if (isOnGround1 && Math.abs(this.player1.body.velocity.y) < 10 && this.player1OrbBoostTimer === 0) {
+                    const expectedY = groundTop - this.HARDCODED_PLAYER_HALF_HEIGHT;
+                    // Only correct if player is very close to expected position (within 2 pixels)
+                    if (Math.abs(this.player1.y - expectedY) <= 2) {
+                        this.player1.y = expectedY;
+                    }
                 }
             }
-            if (isOnGround2 && Math.abs(this.player2.body.velocity.y) < 10 && this.player2OrbBoostTimer === 0) {
-                const expectedY = groundTop - this.HARDCODED_PLAYER_HALF_HEIGHT;
-                // Only correct if player is very close to expected position (within 2 pixels)
-                if (Math.abs(this.player2.y - expectedY) <= 2) {
-                    this.player2.y = expectedY;
+            
+            // Only check player 2 if they haven't fallen into lava
+            if (!this.player2FellInLava && this.player2 && this.player2.body) {
+                const playerBottom2 = this.player2.y + this.HARDCODED_PLAYER_HALF_HEIGHT;
+                const isOnGround2 = this.player2.body.touching.down && Math.abs(playerBottom2 - groundTop) < 50;
+                
+                // Only correct position if player is actually on the ground AND not falling
+                // This prevents forcing player into ground when falling from high heights
+                if (isOnGround2 && Math.abs(this.player2.body.velocity.y) < 10 && this.player2OrbBoostTimer === 0) {
+                    const expectedY = groundTop - this.HARDCODED_PLAYER_HALF_HEIGHT;
+                    // Only correct if player is very close to expected position (within 2 pixels)
+                    if (Math.abs(this.player2.y - expectedY) <= 2) {
+                        this.player2.y = expectedY;
+                    }
                 }
             }
         }
@@ -755,17 +797,27 @@ export class Volcano extends Phaser.Scene {
         this.updateLavaOrbs(dt);
         this.updateOrbSequence(dt);
         
-        this.checkClimbing(this.player1);
-        this.checkClimbing(this.player2);
+        // HARDCODED: Only check climbing and update players if they haven't fallen into lava and aren't frozen for message
+        if (!this.player1FellInLava && !this.playersFrozenForLavaMessage) {
+            this.checkClimbing(this.player1);
+        }
+        if (!this.player2FellInLava && !this.playersFrozenForLavaMessage) {
+            this.checkClimbing(this.player2);
+        }
         
-        if (!this.playersFrozen) {
-            this.updatePlayer(this.player1, { up: this.wKey, down: this.sKey, left: this.cursorsWASD.A, right: this.cursorsWASD.D });
-            this.updatePlayer(this.player2, { up: this.upKey, down: this.downKey, left: this.cursorsArrows.left, right: this.cursorsArrows.right });
+        if (!this.playersFrozen && !this.playersFrozenForLavaMessage) {
+            // HARDCODED: Only update players if they haven't fallen into lava and aren't frozen for message
+            if (!this.player1FellInLava) {
+                this.updatePlayer(this.player1, { up: this.wKey, down: this.sKey, left: this.cursorsWASD.A, right: this.cursorsWASD.D });
+            }
+            if (!this.player2FellInLava) {
+                this.updatePlayer(this.player2, { up: this.upKey, down: this.downKey, left: this.cursorsArrows.left, right: this.cursorsArrows.right });
+            }
         } else {
-            if (this.player1 && this.player1.body) {
+            if (this.player1 && this.player1.body && (!this.player1FellInLava || this.playersFrozenForLavaMessage)) {
                 this.player1.body.setVelocity(0, 0);
             }
-            if (this.player2 && this.player2.body) {
+            if (this.player2 && this.player2.body && (!this.player2FellInLava || this.playersFrozenForLavaMessage)) {
                 this.player2.body.setVelocity(0, 0);
             }
         }
@@ -1398,6 +1450,10 @@ export class Volcano extends Phaser.Scene {
                 this.lavaEventNumber = 2;
                 this.player1LavaDebuff = false;
                 this.player2LavaDebuff = false;
+                this.player1FellInLava = false;
+                this.player2FellInLava = false;
+                this.player1Respawned = true;
+                this.player2Respawned = true;
             }
             if (this.lavaEventNumber === 2) {
                 currentWarningStart = this.lavaRiseStartTime2;
@@ -1413,6 +1469,10 @@ export class Volcano extends Phaser.Scene {
                 this.lavaEventNumber = 2;
                 this.player1LavaDebuff = false;
                 this.player2LavaDebuff = false;
+                this.player1FellInLava = false;
+                this.player2FellInLava = false;
+                this.player1Respawned = true;
+                this.player2Respawned = true;
             }
             if (this.lavaEventNumber === 2) {
                 currentLavaStart = this.lavaRiseActualStart2;
@@ -1458,13 +1518,13 @@ export class Volcano extends Phaser.Scene {
                 if (this.lava) {
                     this.lava.setVisible(true);
                     this.lava.setAlpha(1.0);
-                    this.lava.setDepth(999);
+                    this.lava.setDepth(10001); // HARDCODED: Higher than indicators (10000) to cover them
                 } else {
                     // HARDCODED: Create lava if it doesn't exist (fallback)
                     const lavaStartY = this.HARDCODED_GROUND_TOP;
-                    this.lava = this.add.rectangle(640, lavaStartY, 2000, 0, 0xFF4500);
+                    this.lava = this.add.rectangle(640, lavaStartY, 3500, 0, 0xFF4500);
                     this.lava.setOrigin(0.5, 1.0); // Origin at bottom
-                    this.lava.setDepth(999);
+                    this.lava.setDepth(10001); // HARDCODED: Higher than indicators (10000) to cover them
                     this.lava.setAlpha(1.0);
                     this.lava.setVisible(true);
                     console.log('HARDCODED: Created missing lava in update!');
@@ -1472,14 +1532,14 @@ export class Volcano extends Phaser.Scene {
                 if (this.lavaGlow) {
                     this.lavaGlow.setVisible(true);
                     this.lavaGlow.setAlpha(1.0);
-                    this.lavaGlow.setDepth(1000);
+                    this.lavaGlow.setDepth(10002); // HARDCODED: Higher than lava to show glow
                 }
                 if (this.lavaParticles && this.lavaParticles.length > 0) {
                     this.lavaParticles.forEach(p => {
                         if (p) {
                             p.setVisible(true);
                             p.setAlpha(1.0);
-                            p.setDepth(1001);
+                            p.setDepth(10003); // HARDCODED: Highest for particles
                         }
                     });
                 }
@@ -1503,7 +1563,7 @@ export class Volcano extends Phaser.Scene {
             // Show countdown: 10, 9, 8, ... 1
             const timeUntilRise = currentLavaStart - this.levelTime;
             const countdown = Math.floor(timeUntilRise);
-            this.lavaWarningText.setText(`LAVA RISING IN: ${countdown}`);
+            this.lavaWarningText.setText(`LAVA RISING COOLDOWN: ${countdown}`);
             
             // Pulse effect
             this.lavaWarningText.setScale(1.0 + Math.sin(this.levelTime * 10) * 0.1);
@@ -1524,7 +1584,7 @@ export class Volcano extends Phaser.Scene {
                 if (this.lava) {
                     this.lava.setVisible(true);
                     this.lava.setAlpha(1.0);
-                    this.lava.setDepth(10);
+                    this.lava.setDepth(10001); // HARDCODED: Higher than indicators (10000) to cover them
                     console.log('LAVA OBJECT - Y:', this.lava.y, 'Visible:', this.lava.visible, 'Alpha:', this.lava.alpha, 'Depth:', this.lava.depth);
                 } else {
                     console.error('LAVA OBJECT IS NULL!');
@@ -1532,14 +1592,14 @@ export class Volcano extends Phaser.Scene {
                 if (this.lavaGlow) {
                     this.lavaGlow.setVisible(true);
                     this.lavaGlow.setAlpha(0.8);
-                    this.lavaGlow.setDepth(11);
+                    this.lavaGlow.setDepth(10002); // HARDCODED: Higher than lava to show glow
                 }
                 if (this.lavaParticles && this.lavaParticles.length > 0) {
                     this.lavaParticles.forEach((p, i) => {
                         if (p) {
                             p.setVisible(true);
                             p.setAlpha(1.0);
-                            p.setDepth(12);
+                            p.setDepth(10003); // HARDCODED: Highest for particles
                         }
                     });
                 }
@@ -1577,17 +1637,17 @@ export class Volcano extends Phaser.Scene {
                 this.lava.y = this.lavaStartY; // Bottom always at ground level - NEVER MOVES
                 this.lava.setVisible(true);
                 this.lava.setAlpha(1.0);
-                this.lava.setDepth(999);
+                this.lava.setDepth(10001); // HARDCODED: Higher than indicators (10000) to cover them
                 // HARDCODED: Force update the display
-                this.lava.setSize(2000, currentLavaHeight);
+                this.lava.setSize(3500, currentLavaHeight);
             } else {
                 console.error('LAVA OBJECT MISSING DURING RISE!');
                 // HARDCODED: Try to recreate lava if it's missing
                 if (!this.lava) {
                     const lavaStartY = this.HARDCODED_GROUND_TOP;
-                    this.lava = this.add.rectangle(640, lavaStartY, 2000, 0, 0xFF4500);
+                    this.lava = this.add.rectangle(640, lavaStartY, 3500, 0, 0xFF4500);
                     this.lava.setOrigin(0.5, 1.0); // Origin at bottom center
-                    this.lava.setDepth(999);
+                    this.lava.setDepth(10001); // HARDCODED: Higher than indicators (10000) to cover them
                     this.lava.setAlpha(1.0);
                     this.lava.setVisible(true);
                     console.log('HARDCODED: Recreated missing lava!');
@@ -1602,7 +1662,7 @@ export class Volcano extends Phaser.Scene {
                 this.lavaGlow.y = lavaTopY; // At the surface of the lava
                 this.lavaGlow.setVisible(true);
                 this.lavaGlow.setAlpha(0.8);
-                this.lavaGlow.setDepth(1000);
+                this.lavaGlow.setDepth(10002); // HARDCODED: Higher than lava to show glow
             }
             
             // HARDCODED: Update lava particles - positioned at the TOP SURFACE of lava
@@ -1614,7 +1674,7 @@ export class Volcano extends Phaser.Scene {
                         particle.x = 100 + (index * 80) + Math.cos(this.levelTime * 3 + index) * 5;
                         particle.setVisible(true);
                         particle.setAlpha(1.0);
-                        particle.setDepth(1001);
+                        particle.setDepth(10003); // HARDCODED: Highest for particles
                     }
                 });
             }
@@ -1640,35 +1700,150 @@ export class Volcano extends Phaser.Scene {
         const player1Bottom = this.player1.y + this.HARDCODED_PLAYER_HALF_HEIGHT;
         const player2Bottom = this.player2.y + this.HARDCODED_PLAYER_HALF_HEIGHT;
         
+        // Track if a new player just fell (for message display)
+        let player1JustFell = false;
+        let player2JustFell = false;
+        
         // Check if player 1 falls into lava
-        if (player1Bottom >= lavaTopY && !this.player1LavaDebuff) {
+        if (player1Bottom >= lavaTopY && !this.player1FellInLava) {
+            this.player1FellInLava = true;
             this.player1LavaDebuff = true;
-            console.log('Player 1 touched lava');
-            this.showLavaMessage('Player fell into lava', () => {});
-            this.removeLava();
+            this.player1Respawned = false;
+            player1JustFell = true;
+            // Hide player 1
+            if (this.player1) {
+                this.player1.setVisible(false);
+                this.player1.body.setEnable(false);
+            }
+            console.log('Player 1 (Solari) fell into lava');
         }
         
         // Check if player 2 falls into lava
-        if (player2Bottom >= lavaTopY && !this.player2LavaDebuff) {
+        if (player2Bottom >= lavaTopY && !this.player2FellInLava) {
+            this.player2FellInLava = true;
             this.player2LavaDebuff = true;
-            console.log('Player 2 touched lava');
-            this.showLavaMessage('Player fell into lava', () => {});
-            this.removeLava();
+            this.player2Respawned = false;
+            player2JustFell = true;
+            // Hide player 2
+            if (this.player2) {
+                this.player2.setVisible(false);
+                this.player2.body.setEnable(false);
+            }
+            console.log('Player 2 (Umbrae) fell into lava');
         }
         
+        // HARDCODED: Show appropriate message based on who fell
+        if (player1JustFell && player2JustFell) {
+            // Both players fell at the same time
+            this.removeLava(); // This immediately teleports players to spawn
+            this.showLavaMessage('Both players fell into the lava!', () => {
+                // Players are already at spawn, now they can move (unfrozen)
+            });
+        } else if (player1JustFell) {
+            // Player 1 just fell - check if both have now fallen
+            if (this.player1FellInLava && this.player2FellInLava) {
+                // Both players have now fallen - show combined message
+                this.removeLava(); // This immediately teleports players to spawn
+                this.showLavaMessage('Both players fell into the lava!', () => {
+                    // Players are already at spawn, now they can move (unfrozen)
+                });
+            } else {
+                // Only player 1 fell so far
+                this.showLavaMessage('Solari fell into the lava!', () => {});
+            }
+        } else if (player2JustFell) {
+            // Player 2 just fell - check if both have now fallen
+            if (this.player1FellInLava && this.player2FellInLava) {
+                // Both players have now fallen - show combined message
+                this.removeLava(); // This immediately teleports players to spawn
+                this.showLavaMessage('Both players fell into the lava!', () => {
+                    // Players are already at spawn, now they can move (unfrozen)
+                });
+            } else {
+                // Only player 2 fell so far
+                this.showLavaMessage('Umbrae fell into the lava!', () => {});
+            }
+        }
+        
+        // Check if a player survived (reached top platform)
+        // HARDCODED: Only check survival if lava is still rising and we haven't checked yet
         if (!this.lavaSurvivalChecked && this.lavaRising) {
             const topPlatformY = 150;
             const topPlatformTop = topPlatformY - 15; // Platform height is 30, so top is at y-15
             if (lavaTopY <= topPlatformTop + 20) {
-                const player1Top = this.player1.y - this.HARDCODED_PLAYER_HALF_HEIGHT;
-                const player2Top = this.player2.y - this.HARDCODED_PLAYER_HALF_HEIGHT;
-                if (player1Top < topPlatformTop && player2Top < topPlatformTop && 
-                    !this.player1LavaDebuff && !this.player2LavaDebuff) {
+                // HARDCODED: Check if players survived (only if they didn't fall)
+                const player1Top = !this.player1FellInLava && this.player1 ? this.player1.y - this.HARDCODED_PLAYER_HALF_HEIGHT : 9999;
+                const player2Top = !this.player2FellInLava && this.player2 ? this.player2.y - this.HARDCODED_PLAYER_HALF_HEIGHT : 9999;
+                
+                const player1Survived = player1Top < topPlatformTop && !this.player1FellInLava;
+                const player2Survived = player2Top < topPlatformTop && !this.player2FellInLava;
+                
+                // HARDCODED: Determine outcome and show appropriate message
+                // All influence changes are now per-second rates that stack
+                if (player1Survived && player2Survived) {
+                    // Both players survived - both gain 2 influence/sec
                     this.lavaSurvivalChecked = true;
-                    this.removeLava();
-                    this.showLavaMessage('Both sides survived the lava!', () => {
-                        this.influenceReward = { rate: 3 };
+                    this.removeLava(); // This immediately teleports players to spawn
+                    this.showLavaMessage('Both players escaped the lava!', () => {
+                        // Both get +2 influence/sec (rates stack)
+                        this.player1InfluenceRate += 2;
+                        this.player2InfluenceRate += 2;
+                        // Players are already at spawn, now they can move (unfrozen)
                     });
+                } else if (player1Survived && this.player2FellInLava) {
+                    // Player 1 survived, player 2 fell
+                    this.lavaSurvivalChecked = true;
+                    this.removeLava(); // This immediately teleports players to spawn
+                    // Show message (previous "Umbrae fell" message will be replaced, which is fine)
+                    this.showLavaMessage('Solari escaped the lava!', () => {
+                        // Player 1 (winner) gains +2 influence/sec, Player 2 (loser) loses -2 influence/sec
+                        this.player1InfluenceRate += 2;
+                        this.player2InfluenceRate -= 2;
+                        // Players are already at spawn, now they can move (unfrozen)
+                    });
+                } else if (player2Survived && this.player1FellInLava) {
+                    // Player 2 survived, player 1 fell
+                    this.lavaSurvivalChecked = true;
+                    this.removeLava(); // This immediately teleports players to spawn
+                    // Show message (previous "Solari fell" message will be replaced, which is fine)
+                    this.showLavaMessage('Umbrae escaped the lava!', () => {
+                        // Player 2 (winner) gains +2 influence/sec, Player 1 (loser) loses -2 influence/sec
+                        this.player2InfluenceRate += 2;
+                        this.player1InfluenceRate -= 2;
+                        // Players are already at spawn, now they can move (unfrozen)
+                    });
+                } else if (player1Survived && !this.player2FellInLava) {
+                    // Player 1 survived, player 2 didn't make it (but didn't fall)
+                    this.lavaSurvivalChecked = true;
+                    this.removeLava(); // This immediately teleports players to spawn
+                    this.showLavaMessage('Solari escaped the lava!', () => {
+                        // Player 1 (winner) gains +2 influence/sec, Player 2 (loser) loses -2 influence/sec
+                        this.player1InfluenceRate += 2;
+                        this.player2InfluenceRate -= 2;
+                        // Players are already at spawn, now they can move (unfrozen)
+                    });
+                } else if (player2Survived && !this.player1FellInLava) {
+                    // Player 2 survived, player 1 didn't make it (but didn't fall)
+                    this.lavaSurvivalChecked = true;
+                    this.removeLava(); // This immediately teleports players to spawn
+                    this.showLavaMessage('Umbrae escaped the lava!', () => {
+                        // Player 2 (winner) gains +2 influence/sec, Player 1 (loser) loses -2 influence/sec
+                        this.player2InfluenceRate += 2;
+                        this.player1InfluenceRate -= 2;
+                        // Players are already at spawn, now they can move (unfrozen)
+                    });
+                } else if (this.player1FellInLava && this.player2FellInLava) {
+                    // Both players fell - no influence changes (both lose, nothing happens)
+                    if (!this.lavaSurvivalChecked) {
+                        this.lavaSurvivalChecked = true;
+                        this.removeLava(); // This immediately teleports players to spawn
+                        // HARDCODED: Show message and freeze players (message should have been shown in collision check, but ensure it's shown)
+                        if (!this.lavaMessageText) {
+                            this.showLavaMessage('Both players fell into the lava!', () => {
+                                // Players are already at spawn, now they can move (unfrozen)
+                            });
+                        }
+                    }
                 }
             }
         }
@@ -1676,6 +1851,12 @@ export class Volcano extends Phaser.Scene {
     
     showLavaMessage(text, onComplete = null) {
         // HARDCODED: Show message in center of screen
+        // Clear any existing message timer to prevent premature destruction
+        if (this.lavaMessageTimer) {
+            this.lavaMessageTimer.remove();
+            this.lavaMessageTimer = null;
+        }
+        
         if (this.lavaMessageText) {
             this.lavaMessageText.destroy();
         }
@@ -1688,12 +1869,26 @@ export class Volcano extends Phaser.Scene {
             resolution: 2
         }).setOrigin(0.5, 0.5).setDepth(10000);
         
-        // Remove message after 3 seconds
-        this.time.delayedCall(3000, () => {
+        // HARDCODED: Freeze players while message is visible
+        this.playersFrozenForLavaMessage = true;
+        if (this.player1 && this.player1.body) {
+            this.player1.body.setVelocity(0, 0);
+        }
+        if (this.player2 && this.player2.body) {
+            this.player2.body.setVelocity(0, 0);
+        }
+        
+        // HARDCODED: Remove message after at least 2 seconds (using 2500ms for safety)
+        this.lavaMessageTimer = this.time.delayedCall(2500, () => {
             if (this.lavaMessageText) {
                 this.lavaMessageText.destroy();
                 this.lavaMessageText = null;
             }
+            this.lavaMessageTimer = null;
+            
+            // HARDCODED: Unfreeze players when message disappears
+            this.playersFrozenForLavaMessage = false;
+            
             // HARDCODED: Call callback when message disappears (to restore player color)
             if (onComplete) {
                 onComplete();
@@ -1707,6 +1902,10 @@ export class Volcano extends Phaser.Scene {
         this.lavaRiseTimer = 0;
         this.lavaSurvivalChecked = true; // Mark as checked so we don't check again
         this.lavaWarningActive = false; // Stop warning too
+        
+        // HARDCODED: Store who fell before resetting flags
+        const player1Fell = this.player1FellInLava;
+        const player2Fell = this.player2FellInLava;
         
         // HARDCODED: Completely remove lava entities
         if (this.lava) {
@@ -1730,25 +1929,44 @@ export class Volcano extends Phaser.Scene {
         }
         this.lavaEndTime = this.levelTime;
         
-        // HARDCODED: Return players to start positions after minigame ends
-        this.returnPlayersToStart();
+        // HARDCODED: IMMEDIATELY teleport players to spawn point when lava ends
+        // (player1Fell and player2Fell already stored above)
+        // IMMEDIATELY respawn players at spawn point
+        this.returnPlayersToStart(player1Fell, player2Fell);
         
-        console.log('HARDCODED: Lava removed and stopped rising');
+        // Reset flags for next lava event
+        this.player1LavaDebuff = false;
+        this.player2LavaDebuff = false;
+        this.player1FellInLava = false;
+        this.player2FellInLava = false;
+        this.player1Respawned = true;
+        this.player2Respawned = true;
+        
+        console.log('HARDCODED: Lava removed and stopped rising - players immediately teleported to spawn');
     }
     
-    returnPlayersToStart() {
-        // Return both players to their start positions ABOVE the ground
+    returnPlayersToStart(player1Fell = false, player2Fell = false) {
+        // HARDCODED: Return players to their start positions ABOVE the ground
+        // Always respawn all players when lava event ends (they return to original spawn)
         const player1StartX = 400;
         const spawnY = this.groundTop - this.HARDCODED_PLAYER_HALF_HEIGHT; 
         const player2StartX = 880;
         
-        // Reset player positions and velocities - DISABLE physics temporarily
+        // HARDCODED: Store spawn positions so players stay locked there during message freeze
+        this.player1SpawnX = player1StartX;
+        this.player1SpawnY = spawnY;
+        this.player2SpawnX = player2StartX;
+        this.player2SpawnY = spawnY;
+        
+        // HARDCODED: Always respawn player 1 (they return to original spawn when event ends)
         if (this.player1) {
             // Disable body temporarily to prevent ground collision interference
             this.player1.body.setEnable(false);
             this.player1.x = player1StartX;
             this.player1.y = spawnY; // ABOVE ground
             this.player1.body.setVelocity(0, 0);
+            this.player1.setVisible(true);
+            this.player1Respawned = true;
             // Re-enable body after positioning
             this.time.delayedCall(50, () => {
                 if (this.player1) {
@@ -1757,13 +1975,18 @@ export class Volcano extends Phaser.Scene {
                     this.player1.body.updateFromGameObject();
                 }
             });
+            console.log('HARDCODED: Player 1 (Solari) respawned at X:', player1StartX, 'Y:', spawnY);
         }
+        
+        // HARDCODED: Always respawn player 2 (they return to original spawn when event ends)
         if (this.player2) {
             // Disable body temporarily to prevent ground collision interference
             this.player2.body.setEnable(false);
             this.player2.x = player2StartX;
             this.player2.y = spawnY; // ABOVE ground
             this.player2.body.setVelocity(0, 0);
+            this.player2.setVisible(true);
+            this.player2Respawned = true;
             // Re-enable body after positioning
             this.time.delayedCall(50, () => {
                 if (this.player2) {
@@ -1772,13 +1995,14 @@ export class Volcano extends Phaser.Scene {
                     this.player2.body.updateFromGameObject();
                 }
             });
+            console.log('HARDCODED: Player 2 (Umbrae) respawned at X:', player2StartX, 'Y:', spawnY);
         }
         
         // HARDCODED: Reset global speed/jump to base values (debuffs are per-player)
         this.playerSpeed = this.basePlayerSpeed;
         this.jumpVelocity = this.baseJumpVelocity;
         
-        console.log('HARDCODED: Players returned to start positions - Y:', spawnY, 'Ground top:', this.HARDCODED_GROUND_TOP);
+        console.log('HARDCODED: All players returned to start positions - Y:', spawnY, 'Ground top:', this.HARDCODED_GROUND_TOP);
     }
     
     updateFaultlinePuzzle(dt) {
@@ -1879,31 +2103,42 @@ export class Volcano extends Phaser.Scene {
     }
 
     updateInfluence(dt) {
+        // HARDCODED: Calculate net influence rate per second for each player (all rates stack)
+        let player1NetRate = 0;
+        let player2NetRate = 0;
+        
+        // 1. Lava event rates (persist until next event, stack)
+        player1NetRate += this.player1InfluenceRate;
+        player2NetRate += this.player2InfluenceRate;
+        
+        // 2. Orb sequence bonus (+3/sec for winner)
+        if (this.orbSequenceOwner === 'Solari') {
+            player1NetRate += this.orbSequenceBonusRate; // +3/sec
+        } else if (this.orbSequenceOwner === 'Umbrae') {
+            player2NetRate += this.orbSequenceBonusRate; // +3/sec
+        }
+        
+        // 3. Fault line scales (+1/sec per scale owned, only when scales are active)
+        if (this.scalesActive && this.scales && this.scales.length) {
+            player1NetRate += (this.solariScaleCount || 0); // +1/sec per scale
+            player2NetRate += (this.umbraeScaleCount || 0); // +1/sec per scale
+        }
+        
+        // 4. Legacy influence reward system (if still used)
         if (this.influenceReward) {
             if (!this.influenceReward.endTime || this.levelTime <= this.influenceReward.endTime) {
-                const amount = this.influenceReward.rate * dt;
-                this.player1Influence += amount;
-                this.player2Influence += amount;
+                player1NetRate += this.influenceReward.rate;
+                player2NetRate += this.influenceReward.rate;
             } else {
                 this.influenceReward = null;
             }
         }
         
-        this.influencePenalty = null;
+        // HARDCODED: Apply net rates per second (rates stack, so we sum them all)
+        this.player1Influence += player1NetRate * dt;
+        this.player2Influence += player2NetRate * dt;
         
-        if (this.orbSequenceOwner === 'Solari') {
-            this.player1Influence += this.orbSequenceBonusRate * dt;
-        } else if (this.orbSequenceOwner === 'Umbrae') {
-            this.player2Influence += this.orbSequenceBonusRate * dt;
-        }
-        
-        if (this.scalesActive && this.scales && this.scales.length) {
-            const solariFromScales = (this.solariScaleCount || 0) * dt;
-            const umbraeFromScales = (this.umbraeScaleCount || 0) * dt;
-            this.player1Influence += solariFromScales;
-            this.player2Influence += umbraeFromScales;
-        }
-        
+        // Clamp influence to valid range
         this.player1Influence = Phaser.Math.Clamp(this.player1Influence, 0, this.maxInfluence);
         this.player2Influence = Phaser.Math.Clamp(this.player2Influence, 0, this.maxInfluence);
         
