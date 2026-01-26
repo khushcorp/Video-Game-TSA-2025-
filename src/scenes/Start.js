@@ -1,3 +1,6 @@
+import { TextureGenerator } from '../utils/TextureGenerator.js';
+import { TempleGenerator } from '../utils/TempleGenerator.js';
+
 export class Start extends Phaser.Scene {
 
     constructor() {
@@ -5,406 +8,648 @@ export class Start extends Phaser.Scene {
     }
 
     preload() {
-        // No assets to load for now - using simple shapes
+        this.load.image('center-tv-image', 'assets/image.png');
     }
 
     create() {
-        // ===== TEXTURES =====
-        if (!this.textures.exists('vine-pixel')) {
-            const vineCanvas = this.textures.createCanvas('vine-pixel', 32, 32);
-            const ctx = vineCanvas.context;
+        this.createTextures();
 
-            // Base stem (Twisted/Curved look)
-            ctx.fillStyle = '#1B3D0A'; // Darker green for depth
-            // Create a curved shape using multiple rectangles
-            ctx.fillRect(12, 0, 8, 8);
-            ctx.fillRect(14, 8, 8, 8);
-            ctx.fillRect(16, 16, 8, 8);
-            ctx.fillRect(14, 24, 8, 8);
-            
-            // Stem detail/shadow (matching the curve)
-            ctx.fillStyle = '#0F2405';
-            ctx.fillRect(12, 0, 3, 8);
-            ctx.fillRect(14, 8, 3, 8);
-            ctx.fillRect(16, 16, 3, 8);
-            ctx.fillRect(14, 24, 3, 8);
-            
-            // Thorns/Little branches - Adjusted for curve
-            ctx.fillStyle = '#3D6B1F';
-            ctx.fillRect(10, 4, 2, 2);
-            ctx.fillRect(22, 12, 2, 2);
-            ctx.fillRect(24, 20, 2, 2);
-            ctx.fillRect(12, 28, 2, 2);
-
-            // Large Leaves (Pixel Art Style) - Adjusted positions for twisted stem
-            ctx.fillStyle = '#2D5016'; // Main leaf color
-            
-            // Leaf 1 (Left side, top)
-            ctx.fillRect(4, 2, 8, 6);
-            ctx.fillRect(6, 0, 4, 2);
-            ctx.fillRect(6, 8, 4, 2);
-            
-            // Leaf 2 (Right side, middle)
-            ctx.fillRect(24, 14, 8, 6);
-            ctx.fillRect(26, 12, 4, 2);
-            ctx.fillRect(26, 20, 4, 2);
-            
-            // Leaf 3 (Left side, bottom)
-            ctx.fillRect(6, 24, 8, 6);
-            ctx.fillRect(8, 22, 4, 2);
-            ctx.fillRect(8, 30, 4, 2);
-
-            // Highlights
-            ctx.fillStyle = '#4A8C2D';
-            ctx.fillRect(6, 3, 3, 2);
-            ctx.fillRect(26, 15, 3, 2);
-            ctx.fillRect(8, 25, 3, 2);
-            
-            // Tiny glowy bits/flowers
-            ctx.fillStyle = '#89B84C';
-            ctx.fillRect(10, 4, 2, 2);
-            ctx.fillRect(24, 16, 2, 2);
-            ctx.fillRect(12, 26, 2, 2);
-
-            vineCanvas.refresh();
-        }
-
-        if (!this.textures.exists('totem-pixel')) {
-            const totemCanvas = this.textures.createCanvas('totem-pixel', 40, 50);
-            const ctx = totemCanvas.context;
-
-            // Main body (Gold/Tan base with shading)
-            ctx.fillStyle = '#B8860B'; // Dark gold
-            ctx.fillRect(8, 5, 24, 40);
-            ctx.fillStyle = '#FFD700'; // Gold
-            ctx.fillRect(10, 7, 20, 36);
-
-            // Shading/Depth
-            ctx.fillStyle = '#DAA520'; // Goldenrod
-            ctx.fillRect(25, 7, 5, 36);
-
-            // Intricate Rune Designs (Deep Emerald Green)
-            ctx.fillStyle = '#006400';
-            ctx.fillRect(14, 15, 12, 2); // Top rune
-            ctx.fillRect(14, 25, 12, 2); // Middle rune
-            ctx.fillRect(14, 35, 12, 2); // Bottom rune
-            ctx.fillRect(19, 15, 2, 22); // Vertical connecting rune
-
-            // Face (Glowy Cyan Eyes)
-            ctx.fillStyle = '#00FFFF'; // Cyan
-            ctx.fillRect(12, 10, 4, 4); // Left eye
-            ctx.fillRect(24, 10, 4, 4); // Right eye
-            ctx.fillStyle = '#FFFFFF'; // Eye sparkle
-            ctx.fillRect(13, 11, 1, 1);
-            ctx.fillRect(25, 11, 1, 1);
-
-            // Mouth (Dark shadow)
-            ctx.fillStyle = '#4B3621';
-            ctx.fillRect(18, 18, 4, 2);
-
-            // Totem "Arms" (Minecraft style but stylized)
-            ctx.fillStyle = '#B8860B'; // Dark gold
-            ctx.fillRect(0, 15, 10, 15); // Left arm
-            ctx.fillRect(30, 15, 10, 15); // Right arm
-            ctx.fillStyle = '#FFD700'; // Gold
-            ctx.fillRect(2, 17, 6, 11);
-            ctx.fillRect(32, 17, 6, 11);
-
-            // Emerald gems in arms (Intricate detail)
-            ctx.fillStyle = '#00FF00';
-            ctx.fillRect(3, 20, 4, 4);
-            ctx.fillRect(33, 20, 4, 4);
-
-            totemCanvas.refresh();
-        }
-
-        // ===== PILLAR & RUNE TEXTURES =====
-        const runeColors = ['#FFD700', '#00FFFF', '#FF4500']; // Left (Gold), Middle (Cyan), Right (Orange-Red)
+        this.setupLevel();
+        this.createBackground(); 
+        this.createUI();
+        this.createPlatforms();
+        this.createTVs();
+        this.createPlayers();
+        this.initPuzzles();
+        this.setupInput();
+        this.setupTimer();
+        this.playersFrozen = true;
+        this.cameras.main.centerOn(640, 360);
+        this.startCountdown();
         
-        for (let i = 1; i <= 3; i++) {
-            const pKey = `pillar-pixel-${i}`;
-            const rKey = `rune-pixel-${i}`;
-            const color = runeColors[i-1];
+    }
 
-            // 1. Pillar Texture
-            if (!this.textures.exists(pKey)) {
-                const canvas = this.textures.createCanvas(pKey, 80, 100);
-                const ctx = canvas.context;
-                
-                // Base Stone
-                ctx.fillStyle = '#4A4A4A';
-                ctx.fillRect(0, 0, 80, 100);
-                
-                // Stone Shading/Noise (Re-applied as requested)
-                ctx.fillStyle = '#3A3A3A';
-                for(let j=0; j<100; j++) {
-                    ctx.fillRect(Math.random()*80, Math.random()*100, 4, 4);
-                }
-                
-                // Decorative Carvings (Matches Rune Color)
-                ctx.strokeStyle = color;
-                ctx.lineWidth = 3;
-                ctx.beginPath();
-                if (i === 1) { // Left: Geometric
-                    ctx.moveTo(20, 20); ctx.lineTo(60, 20); ctx.lineTo(40, 80); ctx.closePath();
-                    ctx.moveTo(20, 40); ctx.lineTo(60, 40);
-                } else if (i === 2) { // Middle: Solar/Circle
-                    ctx.arc(40, 50, 25, 0, Math.PI * 2);
-                    ctx.moveTo(40, 25); ctx.lineTo(40, 75);
-                    ctx.moveTo(15, 50); ctx.lineTo(65, 50);
-                } else { // Right: Runic/Z-shape
-                    ctx.moveTo(20, 20); ctx.lineTo(60, 20); ctx.lineTo(20, 80); ctx.lineTo(60, 80);
-                }
-                ctx.stroke();
-                
-                // Vines
-                ctx.strokeStyle = '#1B3D0A';
-                ctx.lineWidth = 4;
-                ctx.beginPath();
-                ctx.moveTo(0, 90); ctx.bezierCurveTo(40, 70, 40, 30, 80, 10);
-                ctx.stroke();
-                ctx.fillStyle = '#2D5016';
-                for(let v=0; v<5; v++) ctx.fillRect(10 + v*12, 80 - v*15, 8, 6);
-                
-                canvas.refresh();
-            }
-
-            // 2. Rune Texture (Distinct for each pillar)
-            if (!this.textures.exists(rKey)) {
-                const canvas = this.textures.createCanvas(rKey, 40, 40);
-                const ctx = canvas.context;
-                
-                // Circular Stone Base
-                ctx.fillStyle = '#5D2906';
-                ctx.beginPath(); ctx.arc(20, 20, 18, 0, Math.PI * 2); ctx.fill();
-                
-                // Shading
-                ctx.fillStyle = '#3D1F1F';
-                ctx.beginPath(); ctx.arc(20, 20, 18, 0, Math.PI); ctx.fill();
-                
-                // Inner Glow Base
-                ctx.fillStyle = '#8B4513';
-                ctx.beginPath(); ctx.arc(20, 20, 14, 0, Math.PI * 2); ctx.fill();
-                
-                // Runic Symbol (Carved - Matches Pillar Symbol Shape and Color)
-                ctx.strokeStyle = color;
-                ctx.lineWidth = 2;
-                ctx.beginPath();
-                if (i === 1) { // Geometric
-                    ctx.moveTo(15, 12); ctx.lineTo(25, 12); ctx.lineTo(20, 28); ctx.closePath();
-                    // Add the missing middle line to match the pillar symbol
-                    ctx.moveTo(15, 18); ctx.lineTo(25, 18);
-                } else if (i === 2) { // Solar
-                    ctx.arc(20, 20, 10, 0, Math.PI * 2);
-                    ctx.moveTo(20, 10); ctx.lineTo(20, 30);
-                    ctx.moveTo(10, 20); ctx.lineTo(30, 20);
-                } else { // Z-shape
-                    ctx.moveTo(12, 12); ctx.lineTo(28, 12); ctx.lineTo(12, 28); ctx.lineTo(28, 28);
-                }
-                ctx.stroke();
-                
-                canvas.refresh();
-            }
+    createTextures() {
+        try {
+            TextureGenerator.createAllTextures(this);
+            TempleGenerator.createTemple(this);
+            console.log('All textures created, temple should be ready');
+        } catch (error) {
+            console.error('Error creating textures:', error);
+            // Continue anyway - game should still work without some background textures
         }
+    }
 
-        // ===== LEVEL SETUP =====
-        // Fixed screen - no camera movement
+    setupLevel() {
         this.baseWidth = 1280;
         this.baseHeight = 720;
+        this.physics.world.setBounds(0, 0, 1280, 720);
+        this.cameras.main.setBounds(0, 0, 1280, 720);
+        this.cameras.main.setScroll(0, 0);
+        this.cameras.main.centerOn(640, 360);
         this.updateViewport();
         this.scale.on('resize', this.updateViewport, this);
+    }
         
-        // ===== BACKGROUND =====
-        // Fullscreen backdrop so the canvas is always filled
+    createBackground() {
         this.fullscreenBg = this.add.rectangle(0, 0, this.scale.width, this.scale.height, 0x2d5016);
         this.fullscreenBg.setOrigin(0, 0);
         this.fullscreenBg.setScrollFactor(0);
         this.fullscreenBg.setDepth(-1000);
 
-        // Store background elements for dynamic resizing
         this.bgRects = [];
-        // Compress game area - main game takes up top 500px, bottom 220px for TV screens
-        // Jungle/forest background - dark green with some texture
-        this.bgRects.push(this.add.rectangle(640, 250, 1280, 500, 0x2d5016)); // Dark green background
-        // Add some variation
-        this.bgRects.push(this.add.rectangle(640, 125, 1280, 100, 0x3d6b1f)); // Lighter green sky
-        this.bgRects.push(this.add.rectangle(640, 400, 1280, 200, 0x1a3d0a)); // Darker green ground
         
-        // TV Screen area at bottom
-        this.bgRects.push(this.add.rectangle(640, 610, 1280, 220, 0x1a1a1a)); // Dark background for TV area
+        if (this.textures.exists('bg-layer0-jungle')) {
+            const jungleBg = this.add.image(640, 200, 'bg-layer0-jungle');
+            jungleBg.setOrigin(0.5, 0.5);
+            jungleBg.setDepth(-950);
+            jungleBg.setScrollFactor(0); 
+            jungleBg.setAlpha(0.7); 
+            this.bgRects.push(jungleBg);
+        }
         
-        // ===== INFLUENCE BARS UI =====
-        this.player1Influence = 0; // Solari influence (0 to 500)
-        this.player2Influence = 0; // Umbrae influence (0 to 500)
+        const nightSky = this.add.rectangle(640, 150, 1280, 300, 0x0a1929);
+        nightSky.setOrigin(0.5, 0.5);
+        nightSky.setDepth(-900);
+        nightSky.setScrollFactor(0); 
+        this.bgRects.push(nightSky);
+        
+        const stars = [
+            {x: 100, y: 50}, {x: 200, y: 80}, {x: 350, y: 40},
+            {x: 500, y: 90}, {x: 650, y: 60}, {x: 800, y: 45},
+            {x: 950, y: 85}, {x: 1100, y: 55}, {x: 1200, y: 75}
+        ];
+        
+        stars.forEach((star, i) => {
+            const starSprite = this.add.circle(star.x, star.y, 2, 0xFFFFFF);
+            starSprite.setDepth(-899);
+            starSprite.setScrollFactor(0);
+            starSprite.setAlpha(0.8);
+            
+            this.tweens.add({
+                targets: starSprite,
+                alpha: {from: 0.8, to: 0.2},
+                duration: 1000 + i * 200,
+                yoyo: true,
+                repeat: -1,
+                ease: 'Sine.easeInOut'
+            });
+            
+            this.bgRects.push(starSprite);
+        });
+        
+        if (this.textures.exists('temple-main')) {
+            const templeMain = this.add.image(320, 400, 'temple-main');
+            templeMain.setOrigin(0.5, 1); 
+            templeMain.setDepth(-200); 
+            templeMain.setScrollFactor(0.1); 
+            templeMain.setAlpha(0.95); 
+            templeMain.setScale(1.0); 
+            templeMain.setTint(0xCCCCCC); 
+            this.bgRects.push(templeMain);
+        }
+        
+        if (this.textures.exists('bg-fog-layer')) {
+            const fogLayer = this.add.image(640, 350, 'bg-fog-layer');
+            fogLayer.setOrigin(0.5, 1);
+            fogLayer.setDepth(-100); 
+            fogLayer.setScrollFactor(0.15); 
+            fogLayer.setAlpha(0.2); 
+            this.bgRects.push(fogLayer);
+        }
+        
+        if (this.textures.exists('bg-layer3-vine-left')) {
+            const vineLeft1 = this.add.image(100, 50, 'bg-layer3-vine-left');
+            vineLeft1.setOrigin(0.5, 0);
+            vineLeft1.setDepth(-30);
+            vineLeft1.setScrollFactor(0.3);
+            this.bgRects.push(vineLeft1);
+            
+            const vineLeft2 = this.add.image(150, 30, 'bg-layer3-vine-left');
+            vineLeft2.setOrigin(0.5, 0);
+            vineLeft2.setDepth(-30);
+            vineLeft2.setScrollFactor(0.3);
+            vineLeft2.setScale(0.8);
+            this.bgRects.push(vineLeft2);
+        }
+        
+        if (this.textures.exists('bg-layer3-vine-right')) {
+            const vineRight1 = this.add.image(1180, 50, 'bg-layer3-vine-right');
+            vineRight1.setOrigin(0.5, 0);
+            vineRight1.setDepth(-30);
+            vineRight1.setScrollFactor(0.3);
+            this.bgRects.push(vineRight1);
+            
+            const vineRight2 = this.add.image(1130, 30, 'bg-layer3-vine-right');
+            vineRight2.setOrigin(0.5, 0);
+            vineRight2.setDepth(-30);
+            vineRight2.setScrollFactor(0.3);
+            vineRight2.setScale(0.8);
+            this.bgRects.push(vineRight2);
+        }
+        
+        if (this.textures.exists('bg-layer3-tree-left')) {
+            const treeLeft = this.add.image(50, 200, 'bg-layer3-tree-left');
+            treeLeft.setOrigin(0, 0.5);
+            treeLeft.setDepth(-25);
+            treeLeft.setScrollFactor(0.3);
+            this.bgRects.push(treeLeft);
+        }
+        
+        if (this.textures.exists('bg-layer3-tree-right')) {
+            const treeRight = this.add.image(1230, 200, 'bg-layer3-tree-right');
+            treeRight.setOrigin(1, 0.5);
+            treeRight.setDepth(-25);
+            treeRight.setScrollFactor(0.3);
+            this.bgRects.push(treeRight);
+        }
+        
+        if (this.textures.exists('bg-layer3-slab')) {
+            const slabLeft = this.add.image(80, 420, 'bg-layer3-slab');
+            slabLeft.setOrigin(0.5, 0.5);
+            slabLeft.setDepth(-20);
+            slabLeft.setScrollFactor(0.3);
+            slabLeft.setRotation(-0.1); 
+            this.bgRects.push(slabLeft);
+            
+            const slabRight = this.add.image(1200, 420, 'bg-layer3-slab');
+            slabRight.setOrigin(0.5, 0.5);
+            slabRight.setDepth(-20);
+            slabRight.setScrollFactor(0.3);
+            slabRight.setRotation(0.1); 
+            this.bgRects.push(slabRight);
+        }
+        
+        if (this.textures.exists('bg-layer3-foliage-bottom')) {
+            const foliageBottom = this.add.image(640, 470, 'bg-layer3-foliage-bottom');
+            foliageBottom.setOrigin(0.5, 1);
+            foliageBottom.setDepth(-15);
+            foliageBottom.setScrollFactor(0.3);
+            this.bgRects.push(foliageBottom);
+        }
+        
+        this.bgRects.push(this.add.rectangle(640, 610, 1280, 220, 0x1a1a1a)); 
+        
+        this.bgRects.forEach((bg, index) => {
+            if (bg && bg.texture) {
+                const key = bg.texture.key;
+                if (key === 'bg-layer1-sky') {
+                    this.tweens.add({
+                        targets: bg,
+                        y: bg.y + 2,
+                        duration: 3000 + Math.random() * 2000,
+                        yoyo: true,
+                        repeat: -1,
+                        ease: 'Sine.easeInOut'
+                    });
+                }
+                if (key === 'bg-layer3-vine-left' || key === 'bg-layer3-vine-right') {
+                    this.tweens.add({
+                        targets: bg,
+                        x: bg.x + (index % 2 === 0 ? 2 : -2),
+                        duration: 2000 + Math.random() * 1000,
+                        yoyo: true,
+                        repeat: -1,
+                        ease: 'Sine.easeInOut',
+                        delay: index * 200
+                    });
+                }
+                if (key === 'bg-fog-layer') {
+                    this.tweens.add({
+                        targets: bg,
+                        alpha: 0.65,
+                        duration: 4000,
+                        yoyo: true,
+                        repeat: -1,
+                        ease: 'Sine.easeInOut'
+                    });
+                }
+            }
+        });
+    }
+
+    createUI() {
+        this.player1Influence = 0; 
+        this.player2Influence = 0; 
         this.maxInfluence = 500;
         
-        // Player 1 (Solari) influence bar
-        this.player1BarBg = this.add.rectangle(320, 30, 400, 30, 0x333333);
+        const centerX = 640;
+        
+        this.player1BarBg = this.add.rectangle(centerX - 400, 30, 400, 30, 0x333333);
         this.player1BarBg.setOrigin(0.5, 0.5);
-        this.player1BarFill = this.add.rectangle(120, 30, 0, 25, 0xFFD700); // Gold
+        this.player1BarBg.setAlpha(0.5); 
+        this.player1BarFill = this.add.rectangle(centerX - 600, 30, 0, 25, 0xFFD700); 
         this.player1BarFill.setOrigin(0, 0.5);
-        this.player1InfluenceText = this.add.text(320, 55, '0/500', { fontSize: '14px', fill: '#ffffff', resolution: 2 }).setOrigin(0.5, 0.5).setDepth(10000);
-        this.player1NameText = this.add.text(320, 75, 'SOLARI', { fontSize: '18px', fill: '#FFD700', fontStyle: 'bold', resolution: 2 }).setOrigin(0.5, 0.5).setDepth(10000);
+        this.player1BarFill.setAlpha(0.7); 
+        this.player1InfluenceText = this.add.text(centerX - 400, 55, '0/500', { fontSize: '14px', fill: '#ffffff', resolution: 2 }).setOrigin(0.5, 0.5).setDepth(10000);
+        this.player1NameText = this.add.text(centerX - 400, 75, 'SOLARI', { fontSize: '18px', fill: '#FFD700', fontStyle: 'bold', resolution: 2 }).setOrigin(0.5, 0.5).setDepth(10000);
         
-        // Player 2 (Umbrae) influence bar
-        this.player2BarBg = this.add.rectangle(960, 30, 400, 30, 0x333333);
+        this.player2BarBg = this.add.rectangle(centerX + 400, 30, 400, 30, 0x333333);
         this.player2BarBg.setOrigin(0.5, 0.5);
-        this.player2BarFill = this.add.rectangle(760, 30, 0, 25, 0x8B00FF); // Purple
+        this.player2BarBg.setAlpha(0.5); 
+        this.player2BarFill = this.add.rectangle(centerX + 200, 30, 0, 25, 0x8B00FF); 
         this.player2BarFill.setOrigin(0, 0.5);
-        this.player2InfluenceText = this.add.text(960, 55, '0/500', { fontSize: '14px', fill: '#ffffff', resolution: 2 }).setOrigin(0.5, 0.5).setDepth(10000);
-        this.player2NameText = this.add.text(960, 75, 'UMBRAE', { fontSize: '18px', fill: '#8B00FF', fontStyle: 'bold', resolution: 2 }).setOrigin(0.5, 0.5).setDepth(10000);
+        this.player2BarFill.setAlpha(0.7); 
+        this.player2InfluenceText = this.add.text(centerX + 400, 55, '0/500', { fontSize: '14px', fill: '#ffffff', resolution: 2 }).setOrigin(0.5, 0.5).setDepth(10000);
+        this.player2NameText = this.add.text(centerX + 400, 75, 'UMBRAE', { fontSize: '18px', fill: '#8B00FF', fontStyle: 'bold', resolution: 2 }).setOrigin(0.5, 0.5).setDepth(10000);
         
-        // ===== INFLUENCE MAP BLOCKS =====
-        // Visual "territory" blocks on the map that reflect how many points of influence
-        // each faction currently has. One block == one influence point.
         this.createInfluenceBlocks();
+    }
         
-        // ===== PLATFORMS =====
+    createPlatforms() {
         this.platforms = [];
-        
-        // Ground level platform (main floor) - compressed to fit above TV area
-        this.ground = this.add.rectangle(640, 440, 1280, 80, 0x8B4513);
+        this.ground = this.add.sprite(640, 440, 'ground-textured');
         this.ground.setOrigin(0.5, 0.5);
         this.physics.add.existing(this.ground, true);
         this.platforms.push(this.ground);
         
-        // Middle platform (for Vine Pattern Wall) - moved down a bit but still above middle pillar
-        const middlePlatform = this.add.rectangle(640, 250, 400, 30, 0x654321);
-        middlePlatform.setOrigin(0.5, 0.5);
-        this.physics.add.existing(middlePlatform, true);
+        if (!this.textures.exists('platform-wood')) {
+            const woodCanvas = this.textures.createCanvas('platform-wood', 150, 25);
+            const ctx = woodCanvas.context;
+            
+            ctx.fillStyle = '#654321';
+            ctx.fillRect(0, 0, 150, 25);
+            
+            ctx.fillStyle = '#5D4037';
+            for (let i = 0; i < 30; i++) {
+                const x = Math.random() * 150;
+                const y = 5 + Math.random() * 15;
+                const size = 2 + Math.random() * 3;
+                ctx.fillRect(x, y, size, size);
+            }
+            
+            ctx.fillStyle = '#4E342E'; 
+            for (let x = 0; x < 150; x += 30) {
+                ctx.fillRect(x, 0, 2, 25);
+            }
+            
+            ctx.strokeStyle = '#4E342E';
+            ctx.lineWidth = 1;
+            for (let x = 0; x < 150; x += 4) {
+                ctx.beginPath();
+                const grainY = 5 + Math.sin(x * 0.1) * 2;
+                ctx.moveTo(x, grainY);
+                ctx.lineTo(x, grainY + 15);
+                ctx.stroke();
+            }
+            
+            ctx.fillStyle = '#8B6F47';
+            for (let y = 2; y < 23; y += 6) {
+                for (let x = 4; x < 146; x += 8) {
+                    if (Math.random() > 0.7) {
+                        ctx.fillRect(x, y, 2, 1);
+                    }
+                }
+            }
+            
+            ctx.fillStyle = '#228B22'; 
+            for (let x = 0; x < 150; x += 2) {
+                const grassHeight = Math.random() > 0.5 ? 2 : (Math.random() > 0.3 ? 3 : 1);
+                ctx.fillRect(x, 0, 2, grassHeight);
+                
+                if (Math.random() > 0.7) {
+                    ctx.fillRect(x, 0, 2, grassHeight + 1);
+                }
+            }
+            
+            ctx.fillStyle = '#32CD32'; 
+            for (let x = 0; x < 150; x += 4) {
+                if (Math.random() > 0.6) {
+                    const grassHeight = Math.random() > 0.5 ? 1 : 2;
+                    ctx.fillRect(x, 0, 2, grassHeight);
+                }
+            }
+            
+            ctx.fillStyle = '#006400'; 
+            for (let x = 0; x < 150; x += 6) {
+                if (Math.random() > 0.7) {
+                    ctx.fillRect(x, 0, 2, 1);
+                }
+            }
+            
+            ctx.fillStyle = '#2C1810'; 
+            ctx.fillRect(0, 23, 150, 2);
+            
+            ctx.fillStyle = '#3E2723';
+            ctx.fillRect(0, 0, 2, 25); 
+            ctx.fillRect(148, 0, 2, 25); 
+            
+            ctx.fillStyle = '#2C1810';
+            for (let x = 15; x < 150; x += 30) {
+                ctx.fillRect(x, 3, 2, 2);
+                ctx.fillRect(x, 20, 2, 2);
+            }
+            
+            woodCanvas.refresh();
+            this.textures.get('platform-wood').setFilter(Phaser.Textures.FilterMode.NEAREST);
+        }
+        
+        if (!this.textures.exists('platform-stone')) {
+            const stoneCanvas = this.textures.createCanvas('platform-stone', 150, 25);
+            const ctx = stoneCanvas.context;
+            
+            ctx.fillStyle = '#696969';
+            ctx.fillRect(0, 0, 150, 25);
+            
+            ctx.fillStyle = '#5D4037'; 
+            for (let i = 0; i < 25; i++) {
+                const x = Math.random() * 150;
+                const y = 5 + Math.random() * 15;
+                const size = 2 + Math.random() * 3;
+                ctx.fillRect(x, y, size, size);
+            }
+            
+            ctx.fillStyle = '#5A5A5A'; 
+            for (let x = 0; x < 150; x += 25) {
+                ctx.fillRect(x, 0, 1, 25);
+            }
+            ctx.fillRect(0, 12, 150, 1);
+            
+            ctx.fillStyle = '#7A7A7A'; 
+            for (let y = 0; y < 25; y += 12) {
+                for (let x = 0; x < 150; x += 25) {
+                    if (Math.random() > 0.5) {
+                        ctx.fillRect(x + 1, y + 1, 23, 11);
+                    }
+                }
+            }
+            
+            ctx.fillStyle = '#4A4A4A'; 
+            for (let i = 0; i < 60; i++) {
+                const x = Math.random() * 150;
+                const y = Math.random() * 25;
+                ctx.fillRect(x, y, 2, 2);
+            }
+            
+            ctx.fillStyle = '#8A8A8A'; 
+            for (let i = 0; i < 40; i++) {
+                const x = Math.random() * 150;
+                const y = Math.random() * 25;
+                ctx.fillRect(x, y, 2, 2);
+            }
+            
+            ctx.fillStyle = '#3A3A3A';
+            ctx.fillRect(0, 0, 2, 25); 
+            ctx.fillRect(148, 0, 2, 25); 
+            
+            ctx.fillStyle = '#696969'; 
+            ctx.fillRect(0, 24, 150, 1);
+            
+            ctx.fillStyle = '#4A4A4A';
+            for (let x = 0; x < 150; x += 25) {
+                ctx.fillRect(x, 0, 1, 25);
+            }
+            ctx.fillRect(0, 12, 150, 1);
+            
+            stoneCanvas.refresh();
+            this.textures.get('platform-stone').setFilter(Phaser.Textures.FilterMode.NEAREST);
+        }
+        
+        const createPlatform = (x, y, width, height, textureKey) => {
+            const shadowHeight = 6; 
+            const shadowY = y + height/2 + shadowHeight/2; 
+            const shadow = this.add.rectangle(x, shadowY, width, shadowHeight, 0x000000, 0.3);
+            shadow.setOrigin(0.5, 0.5);
+            shadow.setDepth(-1); 
+            
+            const platform = this.add.sprite(x, y, textureKey);
+            platform.setDisplaySize(width, height);
+            platform.setOrigin(0.5, 0.5);
+            this.physics.add.existing(platform, true);
+            platform.setDepth(1); 
+            
+            platform.shadow = shadow;
+            
+            return platform;
+        };
+        
+        const middlePlatform = createPlatform(640, 250, 400, 30, 'platform-stone');
         this.platforms.push(middlePlatform);
         
-        // Top platform (for Wind Totem Dial) - moved down a bit but still above middle pillar
-        const topPlatform = this.add.rectangle(640, 70, 300, 30, 0x654321);
-        topPlatform.setOrigin(0.5, 0.5);
-        this.physics.add.existing(topPlatform, true);
+        const topPlatform = createPlatform(640, 70, 300, 30, 'platform-stone');
         this.platforms.push(topPlatform);
         
-        // Additional platforms for parkour - creating a path to the top (original layout)
-        // Step 1: Platforms from ground to middle level
-        const leftPlatform1 = this.add.rectangle(300, 360, 150, 25, 0x654321);
-        leftPlatform1.setOrigin(0.5, 0.5);
-        this.physics.add.existing(leftPlatform1, true);
+        const leftPlatform1 = createPlatform(300, 360, 150, 25, 'platform-stone');
         this.platforms.push(leftPlatform1);
         
-        const rightPlatform1 = this.add.rectangle(980, 360, 150, 25, 0x654321);
-        rightPlatform1.setOrigin(0.5, 0.5);
-        this.physics.add.existing(rightPlatform1, true);
+        const rightPlatform1 = createPlatform(980, 360, 150, 25, 'platform-stone');
         this.platforms.push(rightPlatform1);
         
-        // Step 2: Platforms to reach middle platform - moved down a bit but still above middle pillar
-        const leftPlatform2 = this.add.rectangle(400, 270, 120, 25, 0x654321);
-        leftPlatform2.setOrigin(0.5, 0.5);
-        this.physics.add.existing(leftPlatform2, true);
+        const leftPlatform2 = createPlatform(350, 285, 120, 25, 'platform-wood');
         this.platforms.push(leftPlatform2);
         
-        const rightPlatform2 = this.add.rectangle(880, 270, 120, 25, 0x654321);
-        rightPlatform2.setOrigin(0.5, 0.5);
-        this.physics.add.existing(rightPlatform2, true);
+        const rightPlatform2 = createPlatform(930, 285, 120, 25, 'platform-wood');
         this.platforms.push(rightPlatform2);
         
-        // Step 3: Platforms from middle to top level - moved down a bit but still above middle pillar
-        const leftPlatform3 = this.add.rectangle(450, 130, 100, 25, 0x654321);
-        leftPlatform3.setOrigin(0.5, 0.5);
-        this.physics.add.existing(leftPlatform3, true);
+        const leftPlatform3 = createPlatform(450, 130, 100, 25, 'platform-stone');
         this.platforms.push(leftPlatform3);
         
-        const rightPlatform3 = this.add.rectangle(830, 130, 100, 25, 0x654321);
-        rightPlatform3.setOrigin(0.5, 0.5);
-        this.physics.add.existing(rightPlatform3, true);
+        const rightPlatform3 = createPlatform(830, 130, 100, 25, 'platform-stone');
         this.platforms.push(rightPlatform3);
         
-        // Step 4: Final platforms to reach top platform - moved down a bit but still above middle pillar
-        const leftPlatform4 = this.add.rectangle(500, 70, 100, 25, 0x654321);
-        leftPlatform4.setOrigin(0.5, 0.5);
-        this.physics.add.existing(leftPlatform4, true);
+        const leftPlatform4 = createPlatform(500, 70, 100, 25, 'platform-wood');
         this.platforms.push(leftPlatform4);
         
-        const rightPlatform4 = this.add.rectangle(780, 70, 100, 25, 0x654321);
-        rightPlatform4.setOrigin(0.5, 0.5);
-        this.physics.add.existing(rightPlatform4, true);
+        const rightPlatform4 = createPlatform(780, 70, 100, 25, 'platform-wood');
         this.platforms.push(rightPlatform4);
         
-        // ===== VINES (Climbable) =====
         this.vines = [];
-        // Left vine (goes from ground to top) - moved further away from center
         const leftVine = this.add.tileSprite(50, 400, 32, 360, 'vine-pixel');
-        leftVine.setOrigin(0.5, 1); // Anchor to ground top
+        leftVine.setOrigin(0.5, 1); 
         this.vines.push(leftVine);
         
-        // Right vine (goes from ground to top) - moved further away from center
         const rightVine = this.add.tileSprite(1230, 400, 32, 360, 'vine-pixel');
-        rightVine.setOrigin(0.5, 1); // Anchor to ground top
+        rightVine.setOrigin(0.5, 1); 
         this.vines.push(rightVine);
         
-        // Center-left vine (attached to platform underneath)
-        const centerLeftVine = this.add.tileSprite(350, 257.5, 32, 150, 'vine-pixel');
-        centerLeftVine.setOrigin(0.5, 1); // Anchor to platform top
+        const centerLeftVine = this.add.tileSprite(350, 272.5, 32, 150, 'vine-pixel');
+        centerLeftVine.setOrigin(0.5, 1); 
         this.vines.push(centerLeftVine);
         
-        // Center-right vine (attached to platform underneath)
-        const centerRightVine = this.add.tileSprite(930, 257.5, 32, 150, 'vine-pixel');
-        centerRightVine.setOrigin(0.5, 1); // Anchor to platform top
+        const centerRightVine = this.add.tileSprite(930, 272.5, 32, 150, 'vine-pixel');
+        centerRightVine.setOrigin(0.5, 1); 
         this.vines.push(centerRightVine);
         
-        // Platforms at top of side vines for runes (require W+D or Up+Right to reach)
-        // Left vine top platform (for Player 1 - requires W+D jump from vine)
-        // Moved down and RIGHT (towards center) so player can reach it
-        const leftVineTopPlatform = this.add.rectangle(130, 100, 100, 25, 0x654321);
-        leftVineTopPlatform.setOrigin(0.5, 0.5);
-        this.physics.add.existing(leftVineTopPlatform, true);
+        if (!this.textures.exists('platform-pillar')) {
+            const pillarCanvas = this.textures.createCanvas('platform-pillar', 100, 25);
+            const ctx = pillarCanvas.context;
+            
+            ctx.fillStyle = '#654321';
+            ctx.fillRect(0, 0, 100, 25);
+            
+            ctx.fillStyle = '#5D4037';
+            for (let i = 0; i < 20; i++) {
+                const x = Math.random() * 100;
+                const y = 5 + Math.random() * 15;
+                const size = 2 + Math.random() * 3;
+                ctx.fillRect(x, y, size, size);
+            }
+            
+            ctx.fillStyle = '#4E342E'; 
+            for (let x = 0; x < 100; x += 25) {
+                ctx.fillRect(x, 0, 2, 25);
+            }
+            
+            ctx.strokeStyle = '#4E342E';
+            ctx.lineWidth = 1;
+            for (let x = 0; x < 100; x += 4) {
+                ctx.beginPath();
+                const grainY = 5 + Math.sin(x * 0.1) * 2;
+                ctx.moveTo(x, grainY);
+                ctx.lineTo(x, grainY + 15);
+                ctx.stroke();
+            }
+            
+            ctx.fillStyle = '#8B6F47';
+            for (let y = 2; y < 23; y += 6) {
+                for (let x = 4; x < 96; x += 8) {
+                    if (Math.random() > 0.7) {
+                        ctx.fillRect(x, y, 2, 1);
+                    }
+                }
+            }
+            
+            ctx.fillStyle = '#228B22'; 
+            for (let x = 0; x < 100; x += 2) {
+                const grassHeight = Math.random() > 0.5 ? 2 : (Math.random() > 0.3 ? 3 : 1);
+                ctx.fillRect(x, 0, 2, grassHeight);
+                
+                if (Math.random() > 0.7) {
+                    ctx.fillRect(x, 0, 2, grassHeight + 1);
+                }
+            }
+            
+            ctx.fillStyle = '#32CD32'; 
+            for (let x = 0; x < 100; x += 4) {
+                if (Math.random() > 0.6) {
+                    const grassHeight = Math.random() > 0.5 ? 1 : 2;
+                    ctx.fillRect(x, 0, 2, grassHeight);
+                }
+            }
+            
+            ctx.fillStyle = '#006400'; 
+            for (let x = 0; x < 100; x += 6) {
+                if (Math.random() > 0.7) {
+                    ctx.fillRect(x, 0, 2, 1);
+                }
+            }
+            
+            ctx.fillStyle = '#2C1810'; 
+            ctx.fillRect(0, 23, 100, 2);
+            
+            ctx.fillStyle = '#3E2723';
+            ctx.fillRect(0, 0, 2, 25); 
+            ctx.fillRect(98, 0, 2, 25); 
+            
+            ctx.fillStyle = '#2C1810';
+            for (let x = 12; x < 100; x += 25) {
+                ctx.fillRect(x, 3, 2, 2);
+                ctx.fillRect(x, 20, 2, 2);
+            }
+            
+            pillarCanvas.refresh();
+            this.textures.get('platform-pillar').setFilter(Phaser.Textures.FilterMode.NEAREST);
+        }
+        
+        const leftVineTopPlatform = createPlatform(130, 115, 100, 25, 'platform-pillar');
         this.platforms.push(leftVineTopPlatform);
         
-        // Right vine top platform (for Player 2 - requires Up+Right jump from vine)
-        // Moved down and LEFT (towards center) so player can reach it
-        const rightVineTopPlatform = this.add.rectangle(1150, 100, 100, 25, 0x654321);
-        rightVineTopPlatform.setOrigin(0.5, 0.5);
-        this.physics.add.existing(rightVineTopPlatform, true);
+        const rightVineTopPlatform = createPlatform(1150, 115, 100, 25, 'platform-pillar');
         this.platforms.push(rightVineTopPlatform);
         
-        // Platforms on side vines for pillars - positioned 2/5 up the vine
-        // Vine goes from y: 40 (top) to y: 440 (ground), so 2/5 from ground = y: 280
-        // Left vine platform (for left pillar)
-        const leftVineGroundPlatform = this.add.rectangle(130, 280, 100, 25, 0x654321);
-        leftVineGroundPlatform.setOrigin(0.5, 0.5);
-        this.physics.add.existing(leftVineGroundPlatform, true);
+        const leftVineGroundPlatform = createPlatform(130, 280, 100, 25, 'platform-pillar');
         this.platforms.push(leftVineGroundPlatform);
         
-        // Right vine platform (for right pillar)
-        const rightVineGroundPlatform = this.add.rectangle(1150, 280, 100, 25, 0x654321);
-        rightVineGroundPlatform.setOrigin(0.5, 0.5);
-        this.physics.add.existing(rightVineGroundPlatform, true);
+        const rightVineGroundPlatform = createPlatform(1150, 280, 100, 25, 'platform-pillar');
         this.platforms.push(rightVineGroundPlatform);
-        
-        // ===== TV SCREENS =====
+    }
+
+    createTVs() {
         this.tvElementsP1 = [];
         this.tvElementsP2 = [];
-        // Player 1 TV (left side) - resized so the Simon grid fits fully inside
-        this.tvP1 = this.add.rectangle(320, 600, 500, 220, 0x000000);
-        this.tvP1.setOrigin(0.5, 0.5);
-        this.tvP1.setStrokeStyle(4, 0xFFD700);
-        this.tvP1.setDepth(10);
-        this.tvElementsP1.push(this.tvP1);
+        const centerX = 640;
         
-        // TV frame for Player 1
-        this.tvElementsP1.push(this.add.rectangle(320, 600, 480, 200, 0x1a1a1a).setDepth(11));
-        this.tvElementsP1.push(this.add.text(320, 530, 'SOLARI TV', { fontSize: '16px', fill: '#FFD700', fontStyle: 'bold', resolution: 2 }).setOrigin(0.5, 0.5).setDepth(12));
+        this.tvFrameP1 = this.add.sprite(centerX - 320, 600, 'tv-frame-p1');
+        this.tvFrameP1.setOrigin(0.5, 0.5);
+        this.tvFrameP1.setDepth(10);
+        this.tvElementsP1.push(this.tvFrameP1);
         
-        // Player 2 TV (right side) - resized so the Simon grid fits fully inside
-        this.tvP2 = this.add.rectangle(960, 600, 500, 220, 0x000000);
-        this.tvP2.setOrigin(0.5, 0.5);
-        this.tvP2.setStrokeStyle(4, 0x8B00FF);
-        this.tvP2.setDepth(10);
-        this.tvElementsP2.push(this.tvP2);
+        this.tvFrameP1Glow = this.add.sprite(centerX - 320, 600, 'tv-frame-p1');
+        this.tvFrameP1Glow.setOrigin(0.5, 0.5);
+        this.tvFrameP1Glow.setDepth(9); 
+        this.tvFrameP1Glow.setTint(0xFFD700); 
+        this.tvFrameP1Glow.setAlpha(0.7);
+        this.tvFrameP1Glow.setScale(1.05); 
+        this.tvElementsP1.push(this.tvFrameP1Glow);
         
-        // TV frame for Player 2
-        this.tvElementsP2.push(this.add.rectangle(960, 600, 480, 200, 0x1a1a1a).setDepth(11));
-        this.tvElementsP2.push(this.add.text(960, 530, 'UMBRAE TV', { fontSize: '16px', fill: '#8B00FF', fontStyle: 'bold', resolution: 2 }).setOrigin(0.5, 0.5).setDepth(12));
+        this.tweens.add({
+            targets: this.tvFrameP1Glow,
+            alpha: { from: 0.5, to: 0.9 },
+            duration: 2000,
+            yoyo: true,
+            repeat: -1,
+            ease: 'Sine.easeInOut'
+        });
         
+        this.tvScreenP1 = this.add.rectangle(centerX - 320, 600, 480, 200, 0x0a0a0a);
+        this.tvScreenP1.setOrigin(0.5, 0.5);
+        this.tvScreenP1.setDepth(11);
+        this.tvElementsP1.push(this.tvScreenP1);
         
-        // ===== PLAYERS =====
-        // Ground top is at y=400, players are 50px tall, so spawn at y=375 (ground top - player height/2)
-        // Player 1 (Solari - Light/Gold) - starts left (compressed position)
+        this.tvStaticP1 = this.add.sprite(centerX - 320, 600, 'tv-static-frame-0');
+        this.tvStaticP1.setOrigin(0.5, 0.5);
+        this.tvStaticP1.setDepth(12);
+        this.tvStaticP1.setAlpha(0.15); 
+        this.tvStaticP1.play('tv-static-anim');
+        this.tvElementsP1.push(this.tvStaticP1);
+        
+        this.tvElementsP1.push(this.add.text(centerX - 320, 530, 'SOLARI TV', { fontSize: '16px', fill: '#FFD700', fontStyle: 'bold', resolution: 2 }).setOrigin(0.5, 0.5).setDepth(13));
+        
+        this.tvFrameP2 = this.add.sprite(centerX + 320, 600, 'tv-frame-p2');
+        this.tvFrameP2.setOrigin(0.5, 0.5);
+        this.tvFrameP2.setDepth(10);
+        this.tvElementsP2.push(this.tvFrameP2);
+        
+        this.tvFrameP2Glow = this.add.sprite(centerX + 320, 600, 'tv-frame-p2');
+        this.tvFrameP2Glow.setOrigin(0.5, 0.5);
+        this.tvFrameP2Glow.setDepth(9); 
+        this.tvFrameP2Glow.setTint(0x8B00FF); 
+        this.tvFrameP2Glow.setAlpha(0.7);
+        this.tvFrameP2Glow.setScale(1.05); 
+        this.tvElementsP2.push(this.tvFrameP2Glow);
+        
+        this.tweens.add({
+            targets: this.tvFrameP2Glow,
+            alpha: { from: 0.5, to: 0.9 },
+            duration: 2000,
+            yoyo: true,
+            repeat: -1,
+            ease: 'Sine.easeInOut'
+        });
+        
+        this.tvScreenP2 = this.add.rectangle(centerX + 320, 600, 480, 200, 0x0a0a0a);
+        this.tvScreenP2.setOrigin(0.5, 0.5);
+        this.tvScreenP2.setDepth(11);
+        this.tvElementsP2.push(this.tvScreenP2);
+        
+        this.tvStaticP2 = this.add.sprite(centerX + 320, 600, 'tv-static-frame-0');
+        this.tvStaticP2.setOrigin(0.5, 0.5);
+        this.tvStaticP2.setDepth(12);
+        this.tvStaticP2.setAlpha(0.15); 
+        this.tvStaticP2.play('tv-static-anim');
+        this.tvElementsP2.push(this.tvStaticP2);
+        
+        this.tvElementsP2.push(this.add.text(centerX + 320, 530, 'UMBRAE TV', { fontSize: '16px', fill: '#8B00FF', fontStyle: 'bold', resolution: 2 }).setOrigin(0.5, 0.5).setDepth(13));
+        
+        this.centerTvImage = this.add.image(centerX, 600, 'center-tv-image');
+        this.centerTvImage.setOrigin(0.5, 0.5);
+        this.centerTvImage.setDepth(13);
+        this.centerTvImage.setScale(0.5);
+        this.tvElementsP1.push(this.centerTvImage);
+        this.tvElementsP2.push(this.centerTvImage);
+    }
+
+    createPlayers() {
         this.player1 = this.add.rectangle(200, 375, 50, 50, 0xFFD700);
         this.player1.setOrigin(0.5, 0.5);
         this.physics.add.existing(this.player1);
@@ -417,6 +662,8 @@ export class Start extends Phaser.Scene {
         this.player1.latchedToVine = false;
         this.player1.wWasDown = false;
         this.player1.vineIndicator = null;
+        this.player1.vineParticles = []; // Store falling particles
+        this.player1.lastParticleTime = 0; // Track when last particle was spawned
         this.player1.totemIndicator = null;
         this.player1.teleporting = false; // Track if player is being teleported
         this.player1.vineLatchCooldown = 0; // Cooldown after latching to prevent immediate jump-off
@@ -434,6 +681,8 @@ export class Start extends Phaser.Scene {
         this.player2.latchedToVine = false;
         this.player2.upWasDown = false;
         this.player2.vineIndicator = null;
+        this.player2.vineParticles = []; // Store falling particles
+        this.player2.lastParticleTime = 0; // Track when last particle was spawned
         this.player2.totemIndicator = null;
         this.player2.teleporting = false; // Track if player is being teleported
         this.player2.vineLatchCooldown = 0; // Cooldown after latching to prevent immediate jump-off
@@ -443,8 +692,9 @@ export class Start extends Phaser.Scene {
             this.physics.add.collider(this.player1, platform);
             this.physics.add.collider(this.player2, platform);
         });
+    }
         
-        // ===== PUZZLE NODES =====
+    initPuzzles() {
         this.puzzleNodes = {};
         this.puzzleInfluence = {}; // Track influence per second from each puzzle
         this.puzzleInfluence.windTotemSolari = 0;
@@ -460,18 +710,25 @@ export class Start extends Phaser.Scene {
         
         // 3. Wind Totem Dial (Top Platform) - +3 influence/sec
         this.createWindTotemDial();
+    }
         
-        // ===== INPUT =====
+    setupInput() {
         // Player 1 controls (WASD)
         this.cursorsWASD = this.input.keyboard.addKeys('W,S,A,D');
         this.wKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.W);
+        this.aKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A);
         this.sKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.S);
+        this.dKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D);
+        this.eKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.E);
         this.spaceKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE); // Jump off vine
         
         // Player 2 controls (Arrow keys)
         this.cursorsArrows = this.input.keyboard.createCursorKeys();
         this.upKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.UP);
         this.downKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.DOWN);
+        this.leftKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.LEFT);
+        this.rightKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.RIGHT);
+        this.slashKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.FORWARD_SLASH);
         // Use ENTER / RETURN for Player 2 to jump off vine (near arrow keys)
         this.enterKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER); // Jump off vine
         
@@ -482,112 +739,28 @@ export class Start extends Phaser.Scene {
         // Initialize vine climb speed (can be modified by debuffs)
         this.player1.vineClimbSpeed = this.climbSpeed;
         this.player2.vineClimbSpeed = this.climbSpeed;
+    }
         
-        // ===== LEVEL TIMER =====
+    setupTimer() {
         this.levelTime = 0;
-        this.levelDuration = 300; // 5 minutes in seconds
-        // Timer moved to center middle area
+        this.levelDuration = 300;
         this.timeText = this.add.text(640, 110, '5:00', { fontSize: '24px', fill: '#ffffff', resolution: 2 }).setOrigin(0.5, 0.5).setDepth(10000);
-        
-        // ===== INFLUENCE SYSTEM =====
-        this.influenceRate = 0; // Net influence per second
-        
-        // Start Level 5 Countdown
-        this.playersFrozen = true;
-        this.startCountdown();
+        this.influenceRate = 0;
     }
 
     updateViewport() {
         const width = this.scale.width;
         const height = this.scale.height;
-        // STAY ZOOMED OUT: Use Math.min to ensure the 1280x720 area is fully visible
-        const zoom = Math.min(width / this.baseWidth, height / this.baseHeight);
-        
+        const scaleX = width / this.baseWidth;
+        const scaleY = height / this.baseHeight;
+        const zoom = Math.min(scaleX, scaleY);
         this.cameras.main.setZoom(zoom);
-        this.cameras.main.centerOn(this.baseWidth / 2, this.baseHeight / 2);
-
-        // Calculate visible world dimensions using limits
-        const worldWidthNeeded = width / zoom;
-        const worldHeightNeeded = height / zoom;
-        
-        if (this.bgRects) {
-            const worldWidthNeeded = width / zoom;
-            const worldHeightNeeded = height / zoom;
-            const leftEdge = (this.baseWidth - worldWidthNeeded) / 2;
-            const rightEdge = (this.baseWidth + worldWidthNeeded) / 2;
-
-            // Reposition UI to edges
-            const uiPadding = 320;
-            if (this.player1BarBg) {
-                const p1X = leftEdge + uiPadding;
-                this.player1BarBg.x = p1X;
-                this.player1BarFill.x = p1X - 200;
-                this.player1InfluenceText.x = p1X;
-                this.player1NameText.x = p1X;
-            }
-            if (this.player2BarBg) {
-                const p2X = rightEdge - uiPadding;
-                this.player2BarBg.x = p2X;
-                this.player2BarFill.x = p2X - 200;
-                this.player2InfluenceText.x = p2X;
-                this.player2NameText.x = p2X;
-            }
-
-            // Reposition TVs to edges
-            const tvPadding = 320;
-            if (this.tvElementsP1) {
-                const p1X = leftEdge + tvPadding;
-                this.tvElementsP1.forEach(el => el.x = p1X);
-            }
-            if (this.tvElementsP2) {
-                const p2X = rightEdge - tvPadding;
-                this.tvElementsP2.forEach(el => el.x = p2X);
-            }
-
-            // Reposition mini-games
-            if (this.simonSaysContainerP1) {
-                this.simonSaysContainerP1.x = leftEdge + tvPadding;
-            }
-            if (this.simonSaysContainerP2) {
-                this.simonSaysContainerP2.x = rightEdge - tvPadding;
-            }
-            if (this.lightsOutP1 && this.lightsOutP1.container) {
-                this.lightsOutP1.container.x = leftEdge + tvPadding;
-            }
-            if (this.lightsOutP2 && this.lightsOutP2.container) {
-                this.lightsOutP2.container.x = rightEdge - tvPadding;
-            }
-
-            // All background rectangles span full width
-            this.bgRects.forEach(rect => {
-                rect.width = worldWidthNeeded;
-                rect.x = this.baseWidth / 2;
-            });
-
-            // The ground also spans full width
-            if (this.ground) {
-                this.ground.width = worldWidthNeeded;
-                this.ground.x = this.baseWidth / 2;
-                // Update physics body size
-                if (this.ground.body) {
-                    this.ground.body.setSize(worldWidthNeeded, 80);
-                }
-            }
-
-            // The TV area (last in bgRects) needs to extend to the bottom
-            const tvBg = this.bgRects[3];
-            const bottomDiff = (worldHeightNeeded - this.baseHeight) / 2;
-            if (bottomDiff > 0) {
-                tvBg.height = 220 + bottomDiff * 2;
-                tvBg.y = 610 + bottomDiff;
-            } else {
-                tvBg.height = 220;
-                tvBg.y = 610;
-            }
-        }
+        this.cameras.main.setBounds(0, 0, this.baseWidth, this.baseHeight);
+        this.cameras.main.setScroll(0, 0);
+        this.cameras.main.centerOn(640, 360);
 
         if (this.fullscreenBg) {
-            this.fullscreenBg.setSize(width, height);
+            this.fullscreenBg.setSize(width / zoom, height / zoom);
         }
     }
 
@@ -623,34 +796,129 @@ export class Start extends Phaser.Scene {
         // IMPORTANT: Array order must match pillar order: [left (0), middle (1), right (2)]
         this.runes = [];
         
-        // Left rune - on left vine top platform (requires W+D to reach)
-        const leftRune = this.add.sprite(130, 75, 'rune-pixel-1');
+        // Left rune - on left vine top platform (requires W+D to reach) - NOW ORANGE
+        // Platform is at y=115, height=25, so platform top is at y=102.5, orb sits at y=80 (moved up more)
+        const leftRune = this.add.sprite(130, 80, 'rune-pixel-3'); // Changed to rune-pixel-3 (orange)
         leftRune.setOrigin(0.5, 0.5);
         leftRune.runeIndex = 0;
         leftRune.collected = false;
-        leftRune.glow = this.add.circle(130, 75, 25, 0xFFD700, 0.3);
+        leftRune.glow = this.add.circle(130, 80, 25, 0xFF4500, 0.3); // Orange glow
         leftRune.glow.setOrigin(0.5, 0.5);
+        // Add pulsing glow animation
+        this.tweens.add({
+            targets: leftRune.glow,
+            alpha: { from: 0.2, to: 0.6 },
+            scale: { from: 0.9, to: 1.2 },
+            duration: 1500,
+            yoyo: true,
+            repeat: -1,
+            ease: 'Sine.easeInOut'
+        });
+        // Add bouncing animation to orb
+        this.tweens.add({
+            targets: leftRune,
+            y: { from: 75, to: 85 },
+            duration: 1000,
+            yoyo: true,
+            repeat: -1,
+            ease: 'Sine.easeInOut'
+        });
+        // Sync glow with orb bounce
+        this.tweens.add({
+            targets: leftRune.glow,
+            y: { from: 75, to: 85 },
+            duration: 1000,
+            yoyo: true,
+            repeat: -1,
+            ease: 'Sine.easeInOut'
+        });
         this.runes.push(leftRune); // runes[0] = left pillar (index 0)
         
         // Middle rune - spawns randomly after 25 seconds
-        const middleRune = this.add.sprite(640, 75, 'rune-pixel-2');
+        const middleRune = this.add.sprite(640, 90, 'rune-pixel-2');
         middleRune.setOrigin(0.5, 0.5);
         middleRune.runeIndex = 1;
         middleRune.collected = false;
-        middleRune.glow = this.add.circle(640, 75, 25, 0x00FFFF, 0.3); // Matching cyan glow
+        middleRune.glow = this.add.circle(640, 90, 25, 0x00FFFF, 0.3); // Matching cyan glow
         middleRune.glow.setOrigin(0.5, 0.5);
         middleRune.setVisible(false); // Start hidden
         middleRune.glow.setVisible(false);
+        // Add pulsing glow animation (will start when rune becomes visible)
+        this.tweens.add({
+            targets: middleRune.glow,
+            alpha: { from: 0.2, to: 0.6 },
+            scale: { from: 0.9, to: 1.2 },
+            duration: 1500,
+            yoyo: true,
+            repeat: -1,
+            ease: 'Sine.easeInOut',
+            paused: true // Start paused, will resume when rune spawns
+        });
+        middleRune.glowTween = this.tweens.getTweensOf(middleRune.glow)[0];
+        // Add bouncing animation to orb (will start when rune becomes visible)
+        const middleRuneBounce = this.tweens.add({
+            targets: middleRune,
+            y: { from: 85, to: 95 },
+            duration: 1000,
+            yoyo: true,
+            repeat: -1,
+            ease: 'Sine.easeInOut',
+            paused: true // Start paused, will resume when rune spawns
+        });
+        middleRune.bounceTween = middleRuneBounce;
+        // Sync glow with orb bounce
+        const middleRuneGlowBounce = this.tweens.add({
+            targets: middleRune.glow,
+            y: { from: 85, to: 95 },
+            duration: 1000,
+            yoyo: true,
+            repeat: -1,
+            ease: 'Sine.easeInOut',
+            paused: true // Start paused, will resume when rune spawns
+        });
+        middleRune.glowBounceTween = middleRuneGlowBounce;
         this.runes.push(middleRune); // runes[1] = middle pillar (index 1)
         
-        // Right rune - on right vine top platform (requires Up+Right to reach)
-        const rightRune = this.add.sprite(1150, 75, 'rune-pixel-3');
+        // Right rune - on right vine top platform (requires Up+Right to reach) - NOW YELLOW
+        // Platform is at y=115, height=25, so platform top is at y=102.5, orb sits at y=80 (moved up more)
+        const rightRune = this.add.sprite(1150, 80, 'rune-pixel-1'); // Changed to rune-pixel-1 (yellow)
         rightRune.setOrigin(0.5, 0.5);
         rightRune.runeIndex = 2;
         rightRune.collected = false;
-        rightRune.glow = this.add.circle(1150, 75, 25, 0xFF4500, 0.3); // Matching orange glow
+        rightRune.glow = this.add.circle(1150, 80, 25, 0xFFD700, 0.3); // Yellow/gold glow
         rightRune.glow.setOrigin(0.5, 0.5);
+        // Add pulsing glow animation
+        this.tweens.add({
+            targets: rightRune.glow,
+            alpha: { from: 0.2, to: 0.6 },
+            scale: { from: 0.9, to: 1.2 },
+            duration: 1500,
+            yoyo: true,
+            repeat: -1,
+            ease: 'Sine.easeInOut'
+        });
+        // Add bouncing animation to orb
+        this.tweens.add({
+            targets: rightRune,
+            y: { from: 75, to: 85 },
+            duration: 1000,
+            yoyo: true,
+            repeat: -1,
+            ease: 'Sine.easeInOut'
+        });
+        // Sync glow with orb bounce
+        this.tweens.add({
+            targets: rightRune.glow,
+            y: { from: 75, to: 85 },
+            duration: 1000,
+            yoyo: true,
+            repeat: -1,
+            ease: 'Sine.easeInOut'
+        });
         this.runes.push(rightRune); // runes[2] = right pillar (index 2)
+        
+        // Create standalone torches on the ground around the map
+        this.createGroundTorches();
         
         // Middle rune spawn system
         this.middleRuneSpawnTimer = 25; // 25 seconds until spawn
@@ -673,14 +941,14 @@ export class Start extends Phaser.Scene {
         const allPossiblePositions = [
             { x: 300, y: 332 },   // leftPlatform1
             { x: 980, y: 332 },   // rightPlatform1
-            { x: 400, y: 242 },   // leftPlatform2
-            { x: 880, y: 242 },   // rightPlatform2
+            { x: 350, y: 257 },   // leftPlatform2 (moved down and left)
+            { x: 930, y: 257 },   // rightPlatform2 (moved down and right)
             { x: 450, y: 102 },   // leftPlatform3
             { x: 830, y: 102 },   // rightPlatform3
             { x: 500, y: 42 },    // leftPlatform4
             { x: 780, y: 42 },    // rightPlatform4
-            { x: 130, y: 72 },    // leftVineTopPlatform
-            { x: 1150, y: 72 }    // rightVineTopPlatform
+            { x: 130, y: 80 },    // leftVineTopPlatform (orb position, platform is at y=115)
+            { x: 1150, y: 80 }    // rightVineTopPlatform (orb position, platform is at y=115)
         ];
         
         // HARDCODED: Define pillar and puzzle positions to avoid
@@ -714,35 +982,272 @@ export class Start extends Phaser.Scene {
         this.puzzleNodes.forestRunes = this.runesPillars;
     }
 
+    createGroundTorches() {
+        // Ground top is at y=400
+        // Pillar is now 90px tall, positioned above ground
+        // Space torches evenly and avoid platform intersections
+        // Platform positions to avoid:
+        // - leftVineGroundPlatform: x=130, width=100 (80-180)
+        // - leftPlatform1: x=300, width=150 (225-375)
+        // - leftPlatform2: x=350, width=120 (290-410)
+        // - middlePlatform: x=640, width=400 (440-840)
+        // - rightPlatform2: x=930, width=120 (870-990)
+        // - rightPlatform1: x=980, width=150 (905-1055)
+        // - rightVineGroundPlatform: x=1150, width=100 (1100-1200)
+        
+        const groundTop = 400;
+        // Evenly spaced positions avoiding platforms and vines (6 torches)
+        // Left vine at x=50 (width 32, covers 34-66), right vine at x=1230 (width 32, covers 1214-1246)
+        const torchPositions = [
+            { x: 20, y: groundTop },    // Far left (further left, away from vine at x=50)
+            { x: 200, y: groundTop },   // Left (between vine and platform1)
+            { x: 420, y: groundTop },   // Left-center (between platform1 and middle)
+            { x: 850, y: groundTop },   // Right-center (between middle and platform2)
+            { x: 1060, y: groundTop },  // Right (after rightPlatform1, before vine)
+            { x: 1260, y: groundTop }   // Far right (further right, away from vine at x=1230)
+        ];
+        
+        this.groundTorches = [];
+        torchPositions.forEach((pos, index) => {
+            // Create wooden pillar - positioned on ground, origin at bottom
+            // Pillar is 90px tall, so bottom at groundTop, top at groundTop - 90
+            const pillar = this.add.sprite(pos.x, groundTop, 'torch-pillar');
+            pillar.setOrigin(0.5, 1); // Anchor to bottom (sits on ground)
+            pillar.setDepth(10); // Above ground but below platforms
+            
+            // Create animated flame sprite on top of torch
+            // Pillar top is at groundTop - 90, torch stick extends to groundTop - 90 + 16 = groundTop - 74
+            // Flame is now 28px tall (shorter), anchored at bottom
+            const flameY = groundTop - 74; // Top of torch stick (where flame starts)
+            const flame = this.add.sprite(pos.x, flameY, 'flame-frame-0');
+            flame.setOrigin(0.5, 1); // Anchor to bottom (where it meets torch) - points upward
+            flame.setDepth(11);
+            flame.play('flame-flicker');
+            
+            // No tween animation - just the frame animation for simple flicker
+            
+            // Sparking particles - real fire sparks
+            const createSpark = () => {
+                const sparkX = pos.x + (Math.random() - 0.5) * 6;
+                const sparkY = flameY - 5 + Math.random() * 5; // Sparks from flame base
+                
+                // Random spark color (yellow, orange, or white)
+                const sparkColors = [0xFFFF00, 0xFFA500, 0xFFFFFF];
+                const sparkColor = sparkColors[Math.floor(Math.random() * sparkColors.length)];
+                
+                const spark = this.add.circle(sparkX, sparkY, 1 + Math.random(), sparkColor, 1.0);
+                spark.setOrigin(0.5, 0.5);
+                spark.setDepth(12);
+                
+                // Spark flies upward and outward
+                const angle = (Math.random() - 0.5) * Math.PI * 0.6; // Mostly upward, some spread
+                const distance = 8 + Math.random() * 8;
+                const speed = 300 + Math.random() * 200;
+                
+                this.tweens.add({
+                    targets: spark,
+                    x: sparkX + Math.cos(angle) * distance,
+                    y: sparkY - Math.abs(Math.sin(angle)) * distance - Math.random() * 5,
+                    alpha: { from: 1.0, to: 0 },
+                    scale: { from: 1.0, to: 0.3 },
+                    duration: speed,
+                    ease: 'Power2',
+                    onComplete: () => spark.destroy()
+                });
+            };
+            
+            // Continuous sparking - create sparks periodically
+            this.time.addEvent({
+                delay: 200 + Math.random() * 300,
+                callback: createSpark,
+                loop: true,
+                startAt: index * 100 // Stagger timing
+            });
+            
+            // Occasional burst of sparks
+            this.time.addEvent({
+                delay: 2000 + index * 500,
+                callback: () => {
+                    for (let i = 0; i < 3 + Math.floor(Math.random() * 3); i++) {
+                        this.time.delayedCall(i * 50, createSpark);
+                    }
+                },
+                loop: true
+            });
+            
+            // Store reference
+            pillar.flame = flame;
+            this.groundTorches.push(pillar);
+        });
+    }
+
     createVineFlowPuzzle() {
-        // Create vine indicator on middle platform - a wall of vines
-        const vineWallX = 640; // Center of middle platform
+        // Create treasure chest indicator on middle platform
+        const chestX = 640; // Center of middle platform
         // Middle platform is at y: 250, height 30, so top is at y: 235
-        // Position indicator completely above the platform (indicator height is 60, so center it above)
-        const vineWallY = 205; // Completely above platform (235 - 30 = 205, so bottom of indicator is at 235)
+        // Chest is 60px tall, so position it on the platform
+        const chestY = 200; // Sits on top of platform, moved up a bit more (was 210)
         
-        // Create a vine wall structure as the indicator
-        this.vineFlowIndicator = this.add.container(vineWallX, vineWallY);
-        
-        // Main vine wall background
-        const wallBg = this.add.rectangle(0, 0, 120, 60, 0x228B22);
-        wallBg.setStrokeStyle(3, 0x1a5f1a);
-        
-        // Decorative vines on the wall
-        for (let i = 0; i < 3; i++) {
-            const vine = this.add.tileSprite(-40 + i * 40, 0, 16, 40, 'vine-pixel');
-            vine.setOrigin(0.5, 0.5);
-            this.vineFlowIndicator.add(vine);
-        }
-        
-        // Add leaves/flowers as decoration
-        for (let i = 0; i < 4; i++) {
-            const leaf = this.add.circle(-50 + i * 33, -15 + (i % 2) * 30, 6, 0x32CD32);
-            this.vineFlowIndicator.add(leaf);
-        }
-        
-        this.vineFlowIndicator.add(wallBg);
+        // Create treasure chest sprite
+        this.vineFlowIndicator = this.add.sprite(chestX, chestY, 'treasure-chest');
+        this.vineFlowIndicator.setOrigin(0.5, 0.5);
         this.vineFlowIndicator.setDepth(5);
+        
+        // Store gem and coin positions - exact pixel positions from texture
+        // Chest texture is 100x75, center is at (50, 37.5)
+        // Convert texture coordinates to world coordinates: worldX = chestX + (texX - 50), worldY = chestY + (texY - 37.5)
+        const gemPositions = [
+            { x: 14, y: 41, color: 0x000066, name: 'sapphire' },   // Top-left gem center (14, 41)
+            { x: 86, y: 41, color: 0x006600, name: 'emerald' },   // Top-right gem center (86, 41)
+            { x: 86, y: 69, color: 0xCC0000, name: 'ruby' },      // Bottom-right gem center (86, 69)
+            { x: 14, y: 69, color: 0x440066, name: 'amethyst' }    // Bottom-left gem center (14, 69)
+        ];
+        
+        const coinPositions = [
+            { x: 29, y: 54.5 },  // Coin 1 - Left center (29, 54.5)
+            { x: 71, y: 58.5 },  // Coin 2 - Right center (71, 58.5)
+            { x: 50, y: 62.5 },  // Coin 3 - Center (50, 62.5)
+            { x: 39, y: 59.5 },  // Coin 4 - Upper left center (39, 59.5)
+            { x: 61, y: 63.5 }  // Coin 5 - Lower right center (61, 63.5)
+        ];
+        
+        // Create shining animations for gems - small but noticeable
+        this.vineFlowIndicator.gemSparkles = [];
+        gemPositions.forEach((gem, index) => {
+            // Convert texture coordinates to world coordinates
+            const gemX = chestX + (gem.x - 50);
+            const gemY = chestY + (gem.y - 37.5);
+            
+            // Small bright gem glow
+            const gemGlow = this.add.circle(gemX, gemY, 5, gem.color, 0.8);
+            gemGlow.setOrigin(0.5, 0.5);
+            gemGlow.setDepth(6);
+            
+            // Pulsing glow animation - more noticeable
+            this.tweens.add({
+                targets: gemGlow,
+                alpha: { from: 0.6, to: 1.0 },
+                scale: { from: 0.9, to: 1.2 },
+                duration: 800 + index * 150,
+                yoyo: true,
+                repeat: -1,
+                ease: 'Sine.easeInOut'
+            });
+            
+            // Small bright sparkle particles
+            for (let i = 0; i < 2; i++) {
+                const sparkle = this.add.circle(gemX, gemY, 1.5, 0xFFFFFF, 1.0);
+                sparkle.setOrigin(0.5, 0.5);
+                sparkle.setDepth(7);
+                
+                const angle = (Math.PI * 2 * i) / 2 + index;
+                const radius = 4;
+                
+                this.tweens.add({
+                    targets: sparkle,
+                    x: gemX + Math.cos(angle) * radius,
+                    y: gemY + Math.sin(angle) * radius,
+                    alpha: { from: 1.0, to: 0.3 },
+                    scale: { from: 1.0, to: 0.8 },
+                    duration: 1200 + index * 100,
+                    yoyo: true,
+                    repeat: -1,
+                    ease: 'Sine.easeInOut',
+                    delay: i * 300
+                });
+            }
+            
+            // Occasional bright flash
+            this.time.addEvent({
+                delay: 2500 + index * 500,
+                callback: () => {
+                    const flash = this.add.circle(gemX, gemY, 6, 0xFFFFFF, 0.9);
+                    flash.setOrigin(0.5, 0.5);
+                    flash.setDepth(7);
+                    this.tweens.add({
+                        targets: flash,
+                        alpha: 0,
+                        scale: 1.5,
+                        duration: 400,
+                        onComplete: () => flash.destroy()
+                    });
+                },
+                loop: true
+            });
+            
+            this.vineFlowIndicator.gemSparkles.push(gemGlow);
+        });
+        
+        // Create shining animations for gold coins - small but noticeable
+        this.vineFlowIndicator.coinGlows = [];
+        coinPositions.forEach((coin, index) => {
+            // Convert texture coordinates to world coordinates
+            const coinX = chestX + (coin.x - 50);
+            const coinY = chestY + (coin.y - 37.5);
+            
+            // Small bright gold coin glow
+            const coinGlow = this.add.circle(coinX, coinY, 4, 0xFFD700, 0.7);
+            coinGlow.setOrigin(0.5, 0.5);
+            coinGlow.setDepth(6);
+            
+            // Shining pulse animation - more noticeable
+            this.tweens.add({
+                targets: coinGlow,
+                alpha: { from: 0.5, to: 0.9 },
+                scale: { from: 0.95, to: 1.15 },
+                duration: 700 + index * 120,
+                yoyo: true,
+                repeat: -1,
+                ease: 'Sine.easeInOut',
+                delay: index * 150
+            });
+            
+            // Small bright sparkle on coin
+            const sparkle = this.add.circle(coinX, coinY, 1, 0xFFFFFF, 1.0);
+            sparkle.setOrigin(0.5, 0.5);
+            sparkle.setDepth(7);
+            this.tweens.add({
+                targets: sparkle,
+                alpha: { from: 0.8, to: 1.0 },
+                scale: { from: 0.8, to: 1.2 },
+                duration: 600 + index * 100,
+                yoyo: true,
+                repeat: -1,
+                ease: 'Sine.easeInOut',
+                delay: index * 100
+            });
+            
+            // Occasional bright flash - smaller but noticeable
+            this.time.addEvent({
+                delay: 1800 + index * 350,
+                callback: () => {
+                    const flash = this.add.circle(coinX, coinY, 5, 0xFFFF00, 0.9);
+                    flash.setOrigin(0.5, 0.5);
+                    flash.setDepth(7);
+                    this.tweens.add({
+                        targets: flash,
+                        alpha: 0,
+                        scale: 1.3,
+                        duration: 350,
+                        onComplete: () => flash.destroy()
+                    });
+                },
+                loop: true
+            });
+            
+            this.vineFlowIndicator.coinGlows.push(coinGlow);
+        });
+        
+        
+        // Subtle chest bounce animation (like it's heavy)
+        this.tweens.add({
+            targets: this.vineFlowIndicator,
+            y: { from: chestY - 1, to: chestY + 1 },
+            duration: 2000,
+            yoyo: true,
+            repeat: -1,
+            ease: 'Sine.easeInOut'
+        });
         
         // Vine Flow state
         this.vineFlowIndicator.active = false;
@@ -752,8 +1257,8 @@ export class Start extends Phaser.Scene {
         
         // Cooldown timer text
         this.vineFlowIndicator.cooldownText = this.add.text(
-            vineWallX,
-            vineWallY - 40,
+            chestX,
+            chestY - 45,
             '',
             {
                 fontSize: '20px',
@@ -765,8 +1270,8 @@ export class Start extends Phaser.Scene {
         this.vineFlowIndicator.cooldownText.setVisible(false);
         
         // Lights Out games for each player on TV screens
-        this.lightsOutP1 = this.createLightsOutGame(320, 600, 'Solari');
-        this.lightsOutP2 = this.createLightsOutGame(960, 600, 'Umbrae');
+        this.lightsOutP1 = this.createLightsOutGame(320, 610, 'Solari');
+        this.lightsOutP2 = this.createLightsOutGame(960, 610, 'Umbrae');
         
         this.puzzleNodes.vineFlow = this.vineFlowIndicator;
     }
@@ -799,35 +1304,48 @@ export class Start extends Phaser.Scene {
         game.container = container;
         
         const gameSize = 200; // Fits better in TV screen
-        const numVines = 6;
+        const numVines = 5; // Changed to 5 to match 5 keys per player
         const vineSpacing = gameSize / (numVines + 1);
         const vineSize = 22; // Slightly smaller to fit better
         
-        // Background - sized to fit in TV (TV is 500x220, so keep it compact)
-        const bgHeight = 200; // Compact height to fit in TV
+        // Background - sized to fit in TV (TV is 480x200, so keep it compact)
+        const bgHeight = 180; // Reduced height to fit better in TV (200px tall)
         const bg = this.add.rectangle(0, 0, gameSize + 20, bgHeight, game.baseColor);
         bg.setStrokeStyle(3, 0xffffff);
         container.add(bg);
         game.bg = bg;
         
-        // Create 7 vines in a row (moved up to make room for text below)
+        // Create 5 passcode displays in a row (moved up to make room for text below)
         const vines = [];
         const vineState = [];
         for (let i = 0; i < numVines; i++) {
             const x = -gameSize/2 + (i + 1) * vineSpacing;
-            const y = -40; // Move vines up to make room for text
+            const y = -50; // Move displays up more to fit everything
             
-            // Create vine tile (leaf)
-            const vine = this.add.rectangle(x, y, vineSize, vineSize, game.offColor);
-            vine.setStrokeStyle(2, 0xffffff); // White border always visible
+            // Create passcode display sprite
+            const vine = this.add.sprite(x, y, 'passcode-display');
             vine.setOrigin(0.5, 0.5);
             vine.index = i;
             vine.isOn = false;
+            
+            // Create digit text overlay (always visible)
+            const digitText = this.add.text(x, y, '?', {
+                fontSize: '16px',
+                fill: '#666666',
+                fontStyle: 'normal',
+                resolution: 2
+            });
+            digitText.setOrigin(0.5, 0.5);
+            digitText.setAlpha(0.4); // Start dimmed (off state)
+            vine.digitText = digitText;
+            
+            // Glow effect when display is "on" (activated)
             vine.glow = this.add.circle(x, y, vineSize/2, game.onColor, 0);
             vine.glow.setOrigin(0.5, 0.5);
             vine.glow.setAlpha(0);
             container.add(vine.glow);
             container.add(vine);
+            container.add(digitText);
             vines.push(vine);
             vineState.push(false);
         }
@@ -835,17 +1353,17 @@ export class Start extends Phaser.Scene {
         game.vineState = vineState;
         game.numVines = numVines;
         
-        // Key hint (showing which keys to use) - above vines
+        // Key hint (showing which keys to use) - above vines, within TV bounds
         const keyHint = playerFaction === 'Solari' 
-            ? this.add.text(0, -70, 'Keys: 1 2 3 4 5 6', {
-                fontSize: '14px',
+            ? this.add.text(0, -80, 'Keys: W A S D E', {
+                fontSize: '12px',
                 fill: '#ffffff',
                 align: 'center',
                 fontStyle: 'bold',
                 resolution: 2
             })
-            : this.add.text(0, -70, 'Keys: 5 6 7 8 9 0', {
-                fontSize: '14px',
+            : this.add.text(0, -80, 'Keys: ↑ ↓ ← → /', {
+                fontSize: '12px',
                 fill: '#ffffff',
                 align: 'center',
                 fontStyle: 'bold',
@@ -856,8 +1374,8 @@ export class Start extends Phaser.Scene {
         game.keyHint = keyHint;
 
         // Timer text (below vines, before instructions)
-        const timerText = this.add.text(0, 5, '15', {
-            fontSize: '16px',
+        const timerText = this.add.text(0, -10, '15', {
+            fontSize: '14px',
             fill: '#ffff00',
             fontStyle: 'bold',
             resolution: 2
@@ -866,13 +1384,13 @@ export class Start extends Phaser.Scene {
         container.add(timerText);
         game.timerText = timerText;
         
-        // Instruction text (positioned well below vines to ensure visibility)
+        // Instruction text (positioned within TV bounds)
         const goalText = playerFaction === 'Solari' 
             ? 'Light ALL vines ON (Sun rewards you!)' 
             : 'Light ALL vines ON (Darkness rewards you!)';
-        const keyText = playerFaction === 'Solari' ? '1-6' : '5-0';
-        const instructionText = this.add.text(0, 50, `HOW TO PLAY:\nPress keys ${keyText} to toggle vines.\nEach press affects that vine and its neighbors.\n${goalText}`, {
-            fontSize: '10px',
+        const keyText = playerFaction === 'Solari' ? 'W/A/S/D/E' : '↑/↓/←/→//';
+        const instructionText = this.add.text(0, 35, `HOW TO PLAY:\nPress keys ${keyText} to toggle vines.\nEach press affects that vine and its neighbors.\n${goalText}`, {
+            fontSize: '9px',
             fill: '#ffffff',
             align: 'center',
             wordWrap: { width: gameSize - 10 },
@@ -882,8 +1400,8 @@ export class Start extends Phaser.Scene {
         game.instructionText = instructionText;
         
         // Status text - add directly to scene, not container, so it's always visible
-        // Position it at the bottom of the visible TV screen area (centerY is 600, TV goes to y=710)
-        const statusText = this.add.text(centerX, centerY + 85, '', {
+        // Position it at the bottom of the TV screen area (centerY is 600, TV goes to y=700)
+        const statusText = this.add.text(centerX, centerY + 75, '', {
             fontSize: '12px',
             fill: '#ffff00',
             fontStyle: 'bold',
@@ -924,10 +1442,146 @@ export class Start extends Phaser.Scene {
         this.windTotem.cooldownText.setVisible(false);
         
         // Simon Says games for each player on TV screens (aligned with TV centers)
-        this.simonSaysP1 = this.createSimonSaysGame(320, 600, 'Solari'); // On Player 1's TV
-        this.simonSaysP2 = this.createSimonSaysGame(960, 600, 'Umbrae'); // On Player 2's TV
+        this.simonSaysP1 = this.createSimonSaysGame(320, 610, 'Solari'); // On Player 1's TV
+        this.simonSaysP2 = this.createSimonSaysGame(960, 610, 'Umbrae'); // On Player 2's TV
+        
+        // Add glowing animations for eyes and runes
+        this.addTotemGlows();
         
         this.puzzleNodes.windTotem = this.windTotem;
+    }
+    
+    addTotemGlows() {
+        const totemX = this.windTotem.x; // 640
+        const totemY = this.windTotem.y; // 35
+        // Texture is 50x60, center is at (25, 30)
+        // Convert texture coordinates to world: worldX = totemX + (texX - 25), worldY = totemY + (texY - 30)
+        
+        // Eye positions (from texture coordinates)
+        // Left eye center: (16 + 2.5, 10 + 2.5) = (18.5, 12.5)
+        // Right eye center: (29 + 2.5, 10 + 2.5) = (31.5, 12.5)
+        const leftEyeX = totemX + (18.5 - 25);
+        const leftEyeY = totemY + (12.5 - 30);
+        const rightEyeX = totemX + (31.5 - 25);
+        const rightEyeY = totemY + (12.5 - 30);
+        
+        // Blue glow for left eye
+        const leftEyeGlow = this.add.circle(leftEyeX, leftEyeY, 4, 0x00FFFF, 0.7);
+        leftEyeGlow.setOrigin(0.5, 0.5);
+        leftEyeGlow.setDepth(this.windTotem.depth + 1);
+        this.tweens.add({
+            targets: leftEyeGlow,
+            alpha: { from: 0.5, to: 1.0 },
+            scale: { from: 0.9, to: 1.3 },
+            duration: 800,
+            yoyo: true,
+            repeat: -1,
+            ease: 'Sine.easeInOut'
+        });
+        
+        // Blue glow for right eye
+        const rightEyeGlow = this.add.circle(rightEyeX, rightEyeY, 4, 0x00FFFF, 0.7);
+        rightEyeGlow.setOrigin(0.5, 0.5);
+        rightEyeGlow.setDepth(this.windTotem.depth + 1);
+        this.tweens.add({
+            targets: rightEyeGlow,
+            alpha: { from: 0.5, to: 1.0 },
+            scale: { from: 0.9, to: 1.3 },
+            duration: 800,
+            yoyo: true,
+            repeat: -1,
+            ease: 'Sine.easeInOut',
+            delay: 200 // Slight offset for visual interest
+        });
+        
+        // Occasional bright flash for eyes
+        this.time.addEvent({
+            delay: 2500,
+            callback: () => {
+                const flash1 = this.add.circle(leftEyeX, leftEyeY, 6, 0x00FFFF, 0.9);
+                flash1.setOrigin(0.5, 0.5);
+                flash1.setDepth(this.windTotem.depth + 2);
+                const flash2 = this.add.circle(rightEyeX, rightEyeY, 6, 0x00FFFF, 0.9);
+                flash2.setOrigin(0.5, 0.5);
+                flash2.setDepth(this.windTotem.depth + 2);
+                this.tweens.add({
+                    targets: [flash1, flash2],
+                    alpha: 0,
+                    scale: 1.5,
+                    duration: 400,
+                    onComplete: () => {
+                        flash1.destroy();
+                        flash2.destroy();
+                    }
+                });
+            },
+            loop: true
+        });
+        
+        // Rune positions (from texture coordinates)
+        // Top rune center: (25, 9)
+        // Middle rune centers: (25, 21) and (25, 29)
+        // Bottom rune center: (25, 39)
+        const runePositions = [
+            { x: totemX + (25 - 25), y: totemY + (9 - 30) },   // Top
+            { x: totemX + (25 - 25), y: totemY + (21 - 30) },  // Middle top
+            { x: totemX + (25 - 25), y: totemY + (29 - 30) },  // Middle bottom
+            { x: totemX + (25 - 25), y: totemY + (39 - 30) }   // Bottom
+        ];
+        
+        // Green glow for runes
+        this.windTotem.runeGlows = [];
+        runePositions.forEach((rune, index) => {
+            const runeGlow = this.add.circle(rune.x, rune.y, 5, 0x00FF00, 0.6);
+            runeGlow.setOrigin(0.5, 0.5);
+            runeGlow.setDepth(this.windTotem.depth + 1);
+            this.tweens.add({
+                targets: runeGlow,
+                alpha: { from: 0.4, to: 0.8 },
+                scale: { from: 0.9, to: 1.2 },
+                duration: 1000 + index * 150,
+                yoyo: true,
+                repeat: -1,
+                ease: 'Sine.easeInOut',
+                delay: index * 200
+            });
+            
+            // Small sparkle on runes
+            const sparkle = this.add.circle(rune.x, rune.y, 1.5, 0xFFFFFF, 1.0);
+            sparkle.setOrigin(0.5, 0.5);
+            sparkle.setDepth(this.windTotem.depth + 2);
+            this.tweens.add({
+                targets: sparkle,
+                alpha: { from: 0.8, to: 1.0 },
+                scale: { from: 0.8, to: 1.2 },
+                duration: 700 + index * 100,
+                yoyo: true,
+                repeat: -1,
+                ease: 'Sine.easeInOut',
+                delay: index * 150
+            });
+            
+            // Occasional bright flash for runes
+            this.time.addEvent({
+                delay: 3000 + index * 500,
+                callback: () => {
+                    const flash = this.add.circle(rune.x, rune.y, 6, 0x00FF00, 0.9);
+                    flash.setOrigin(0.5, 0.5);
+                    flash.setDepth(this.windTotem.depth + 2);
+                    this.tweens.add({
+                        targets: flash,
+                        alpha: 0,
+                        scale: 1.4,
+                        duration: 350,
+                        onComplete: () => flash.destroy()
+                    });
+                },
+                loop: true,
+                startAt: index * 400
+            });
+            
+            this.windTotem.runeGlows.push(runeGlow);
+        });
     }
     
     createInfluenceBlocks() {
@@ -952,9 +1606,14 @@ export class Start extends Phaser.Scene {
         }
         if (paintable.length === 0) return;
         
+        const size = 10;
+        const minDistance = size + 2; // Minimum distance between pixels to prevent overlap
+        
+        // Try to find a non-overlapping position (max 20 attempts)
+        let pixel = null;
+        for (let attempt = 0; attempt < 20; attempt++) {
         const index = Phaser.Math.Between(0, paintable.length - 1);
         const target = paintable[index];
-        const size = 10;
         
         // Pick a random point inside the target block's bounds
         const halfW = target.width / 2;
@@ -962,15 +1621,34 @@ export class Start extends Phaser.Scene {
         const x = Phaser.Math.Between(target.x - halfW + size / 2, target.x + halfW - size / 2);
         const y = Phaser.Math.Between(target.y - halfH + size / 2, target.y + halfH - size / 2);
         
-        const pixel = this.add.rectangle(x, y, size, size, color);
+            // Check if this position overlaps with any existing pixel
+            let overlaps = false;
+            for (const existingPixel of collection) {
+                const distance = Phaser.Math.Distance.Between(x, y, existingPixel.x, existingPixel.y);
+                if (distance < minDistance) {
+                    overlaps = true;
+                    break;
+                }
+            }
+            
+            // If no overlap, create the pixel
+            if (!overlaps) {
+                pixel = this.add.rectangle(x, y, size, size, color);
         pixel.setOrigin(0.5, 0.5);
+                pixel.setAlpha(0.3); // More transparent and clear
         pixel.setDepth(1); // above background, roughly on top of geometry
         collection.push(pixel);
+                break; // Successfully placed, exit loop
+            }
+        }
+        
+        // If we couldn't find a non-overlapping position after 20 attempts, skip spawning this pixel
     }
     
     createSimonSaysGame(centerX, centerY, playerFaction) {
         // Create Wind Totem rotation memory game on the TV screen
-        const gameSize = 220; // fits fully inside the TV
+        // TV screen is 480x200, so gameSize should fit within 200px height
+        const gameSize = 180; // Reduced to fit within TV height (200px)
         const playerColor = playerFaction === 'Solari' ? 0xFFD700 : 0x8B00FF;
         const baseColor = 0x000000; // TV background
         
@@ -987,31 +1665,34 @@ export class Start extends Phaser.Scene {
             this.simonSaysContainerP2 = container;
         }
         
-        // Background (TV screen content)
+        // Background (TV screen content) - fit within TV height
         const bg = this.add.rectangle(0, 0, gameSize, gameSize, baseColor);
         bg.setOrigin(0.5, 0.5);
         container.add(bg);
         
         // Title (inside the TV container) – shows the player's entered rotation sequence
-        const title = this.add.text(0, -gameSize/2 - 15, '', {
-            fontSize: '18px',
+        // Position within TV bounds: TV goes from y=500 to y=700, center at y=600
+        // So we can use y=-90 to y=+90 relative to center (600)
+        const title = this.add.text(0, -75, '', {
+            fontSize: '16px',
             fill: '#ffffff',
             fontStyle: 'bold',
             resolution: 2
         }).setOrigin(0.5, 0.5);
         container.add(title);
         
-        // Instruction text (outside the container, ABOVE the TV so it's never cut off or hidden)
-        const instructionText = this.add.text(centerX, centerY - gameSize/2 - 35, '', {
-            fontSize: '14px',
+        // Instruction text (inside TV container, at top)
+        const instructionText = this.add.text(0, -85, '', {
+            fontSize: '12px',
             fill: '#ffffff',
             resolution: 2
         }).setOrigin(0.5, 0.5);
+        container.add(instructionText);
         instructionText.setDepth(10001); // above everything in the TV area
         
-        // Round text ("Round X/N") just below the play area
-        const timerText = this.add.text(0, gameSize/2 + 5, 'Round 1/5', {
-            fontSize: '20px',
+        // Round text ("Round X/N") at bottom of play area, within TV bounds
+        const timerText = this.add.text(0, 75, 'Round 1/5', {
+            fontSize: '16px',
             fill: '#ffff00',
             fontStyle: 'bold',
             resolution: 2
@@ -1020,24 +1701,24 @@ export class Start extends Phaser.Scene {
         
         // Plain-text key hints to show what inputs are used,
         // and to highlight (in green) which directions the player has pressed.
-        // Place them in a single row just above the TV, but keep them hidden
-        // until after the HOW TO PLAY text has disappeared.
+        // Place them inside the TV container, just above the totem
         const isSolari = playerFaction === 'Solari';
         const upLabel = isSolari ? 'W' : '↑';
         const leftLabel = isSolari ? 'A' : '←';
         const downLabel = isSolari ? 'S' : '↓';
         const rightLabel = isSolari ? 'D' : '→';
-        const keyStyle = { fontSize: '16px', fill: '#ffffff', resolution: 2 };
+        const keyStyle = { fontSize: '14px', fill: '#ffffff', resolution: 2 };
         
-        const keyRowY = centerY - gameSize/2 - 10;
-        const keyUpText = this.add.text(centerX - 60, keyRowY, upLabel, keyStyle).setOrigin(0.5, 0.5);
-        const keyLeftText = this.add.text(centerX - 20, keyRowY, leftLabel, keyStyle).setOrigin(0.5, 0.5);
-        const keyDownText = this.add.text(centerX + 20, keyRowY, downLabel, keyStyle).setOrigin(0.5, 0.5);
-        const keyRightText = this.add.text(centerX + 60, keyRowY, rightLabel, keyStyle).setOrigin(0.5, 0.5);
-        keyUpText.setDepth(10001);
-        keyLeftText.setDepth(10001);
-        keyDownText.setDepth(10001);
-        keyRightText.setDepth(10001);
+        // Position key hints inside TV, above totem
+        const keyRowY = -50;
+        const keyUpText = this.add.text(-60, keyRowY, upLabel, keyStyle).setOrigin(0.5, 0.5);
+        const keyLeftText = this.add.text(-20, keyRowY, leftLabel, keyStyle).setOrigin(0.5, 0.5);
+        const keyDownText = this.add.text(20, keyRowY, downLabel, keyStyle).setOrigin(0.5, 0.5);
+        const keyRightText = this.add.text(60, keyRowY, rightLabel, keyStyle).setOrigin(0.5, 0.5);
+        container.add(keyUpText);
+        container.add(keyLeftText);
+        container.add(keyDownText);
+        container.add(keyRightText);
         keyUpText.setVisible(false);
         keyLeftText.setVisible(false);
         keyDownText.setVisible(false);
@@ -1213,12 +1894,23 @@ export class Start extends Phaser.Scene {
     }
     
     updateRuneIndicators() {
-        // Player 1 rune indicator
+        // Rune sprite keys: [Orange (0), Cyan (1), Yellow (2)]
+        const runeSpriteKeys = ['rune-pixel-3', 'rune-pixel-2', 'rune-pixel-1'];
+        
+        // Player 1 rune indicator - show orb's sprite with same shade and symbol
         if (this.player1.carriedRune !== null) {
+            const runeSpriteKey = runeSpriteKeys[this.player1.carriedRune];
             if (!this.player1.runeIndicator) {
-                this.player1.runeIndicator = this.add.circle(this.player1.x, this.player1.y - 40, 15, 0xFFD700, 0.8);
-                this.player1.runeIndicator.setStrokeStyle(2, 0xFFFFFF);
+                // Create sprite indicator showing the actual rune
+                this.player1.runeIndicator = this.add.sprite(this.player1.x, this.player1.y - 40, runeSpriteKey);
+                this.player1.runeIndicator.setOrigin(0.5, 0.5);
+                this.player1.runeIndicator.setScale(0.6); // Smaller than actual rune
+                this.player1.runeIndicator.setDepth(10000);
             } else {
+                // Update sprite if rune changed
+                if (this.player1.runeIndicator.texture.key !== runeSpriteKey) {
+                    this.player1.runeIndicator.setTexture(runeSpriteKey);
+                }
                 this.player1.runeIndicator.setPosition(this.player1.x, this.player1.y - 40);
                 this.player1.runeIndicator.setVisible(true);
             }
@@ -1226,12 +1918,20 @@ export class Start extends Phaser.Scene {
             this.player1.runeIndicator.setVisible(false);
         }
         
-        // Player 2 rune indicator
+        // Player 2 rune indicator - show orb's sprite with same shade and symbol
         if (this.player2.carriedRune !== null) {
+            const runeSpriteKey = runeSpriteKeys[this.player2.carriedRune];
             if (!this.player2.runeIndicator) {
-                this.player2.runeIndicator = this.add.circle(this.player2.x, this.player2.y - 40, 15, 0x8B00FF, 0.8);
-                this.player2.runeIndicator.setStrokeStyle(2, 0xFFFFFF);
+                // Create sprite indicator showing the actual rune
+                this.player2.runeIndicator = this.add.sprite(this.player2.x, this.player2.y - 40, runeSpriteKey);
+                this.player2.runeIndicator.setOrigin(0.5, 0.5);
+                this.player2.runeIndicator.setScale(0.6); // Smaller than actual rune
+                this.player2.runeIndicator.setDepth(10000);
             } else {
+                // Update sprite if rune changed
+                if (this.player2.runeIndicator.texture.key !== runeSpriteKey) {
+                    this.player2.runeIndicator.setTexture(runeSpriteKey);
+                }
                 this.player2.runeIndicator.setPosition(this.player2.x, this.player2.y - 40);
                 this.player2.runeIndicator.setVisible(true);
             }
@@ -1330,6 +2030,13 @@ export class Start extends Phaser.Scene {
                     this.player1.body.setVelocityY(0);
                 }
                 this.player1.wWasDown = true;
+                
+                // Spawn falling particles while climbing - less frequent
+                const currentTime = this.time.now;
+                if (currentTime - this.player1.lastParticleTime > 100) { // Spawn particle every 100ms (less frequent)
+                    this.spawnVineParticle(this.player1);
+                    this.player1.lastParticleTime = currentTime;
+                }
             } 
             // Not climbing, slow fall (remain latched)
             else {
@@ -1462,6 +2169,13 @@ export class Start extends Phaser.Scene {
                     this.player2.body.setVelocityY(0);
                 }
                 this.player2.upWasDown = true;
+                
+                // Spawn falling particles while climbing - less frequent
+                const currentTime = this.time.now;
+                if (currentTime - this.player2.lastParticleTime > 100) { // Spawn particle every 100ms (less frequent)
+                    this.spawnVineParticle(this.player2);
+                    this.player2.lastParticleTime = currentTime;
+                }
             } 
             // Not climbing, slow fall (remain latched)
             else {
@@ -1502,6 +2216,46 @@ export class Start extends Phaser.Scene {
         // Soft horizontal limits
         if (this.player2.x < 25) this.player2.x = 25;
         if (this.player2.x > 1255) this.player2.x = 1255;
+    }
+
+    spawnVineParticle(player) {
+        // Create pixelated green falling particles (leaves/debris)
+        const particleColors = [0x228B22, 0x32CD32, 0x3CB371, 0x2E8B57, 0x6B8E23, 0x556B2F, 0x8FBC8F, 0x90EE90]; // Various shades of green
+        const color = particleColors[Math.floor(Math.random() * particleColors.length)];
+        
+        // Spawn pixelated particle near player's position
+        const offsetX = (Math.random() - 0.5) * 30; // Horizontal spread
+        const particleSize = 3 + Math.floor(Math.random() * 3); // Pixel sizes: 3, 4, or 5px (pixelated)
+        
+        // Use rectangle for pixelated look instead of circle
+        const particle = this.add.rectangle(player.x + offsetX, player.y + 15, particleSize, particleSize, color, 1.0);
+        particle.setOrigin(0.5, 0.5);
+        particle.setDepth(player.depth - 1); // Behind player
+        
+        // Animate pixelated particle falling and fading
+        const fallDistance = 40 + Math.random() * 50;
+        const fallSpeed = 400 + Math.random() * 300; // Slower fall
+        const horizontalDrift = (Math.random() - 0.5) * 60;
+        
+        this.tweens.add({
+            targets: particle,
+            y: particle.y + fallDistance,
+            x: particle.x + horizontalDrift,
+            alpha: { from: 1.0, to: 0 },
+            scale: { from: 1, to: 0.4 },
+            duration: fallSpeed,
+            ease: 'Power1',
+            onComplete: () => {
+                particle.destroy();
+                // Remove from array
+                const index = player.vineParticles.indexOf(particle);
+                if (index > -1) {
+                    player.vineParticles.splice(index, 1);
+                }
+            }
+        });
+        
+        player.vineParticles.push(particle);
     }
 
     checkClimbing(player) {
@@ -1608,6 +2362,17 @@ export class Start extends Phaser.Scene {
                     middleRune.collected = false;
                     this.middleRuneSpawned = true;
                     this.middleRuneTimerText.setVisible(false);
+                    // Resume glow animation when rune spawns
+                    if (middleRune.glowTween) {
+                        middleRune.glowTween.resume();
+                    }
+                    // Start bounce animation when rune spawns
+                    if (middleRune.bounceTween) {
+                        middleRune.bounceTween.resume();
+                    }
+                    if (middleRune.glowBounceTween) {
+                        middleRune.glowBounceTween.resume();
+                    }
                 } else {
                     // Fallback: spawn at a guaranteed safe position if all are blocked
                     middleRune.x = 300;
@@ -1619,6 +2384,17 @@ export class Start extends Phaser.Scene {
                     middleRune.collected = false;
                     this.middleRuneSpawned = true;
                     this.middleRuneTimerText.setVisible(false);
+                    // Resume glow animation when rune spawns
+                    if (middleRune.glowTween) {
+                        middleRune.glowTween.resume();
+                    }
+                    // Start bounce animation when rune spawns
+                    if (middleRune.bounceTween) {
+                        middleRune.bounceTween.resume();
+                    }
+                    if (middleRune.glowBounceTween) {
+                        middleRune.glowBounceTween.resume();
+                    }
                 }
             } else {
                 // Update timer text
@@ -1659,17 +2435,20 @@ export class Start extends Phaser.Scene {
         });
         
         // Update pillar placement - players press W/Up arrow near pillar to place rune
-        // HARDCODED: Any rune can be placed in any pillar
+        // Mapping: runeIndex 0 (orange) -> pillar 2 (right), runeIndex 1 (cyan) -> pillar 1 (middle), runeIndex 2 (yellow) -> pillar 0 (left)
+        const runeToPillarMap = { 0: 2, 1: 1, 2: 0 }; // Orange->Right, Cyan->Middle, Yellow->Left
+        
+        // HARDCODED: Runes can only be placed in matching pillars
         this.runesPillars.forEach((pillar, index) => {
             // Increase distance check for middle pillar (index 1) to make it easier to place runes
             const distanceThreshold = index === 1 ? 80 : 60; // Middle pillar gets larger interaction radius
             const p1Near = Phaser.Math.Distance.Between(this.player1.x, this.player1.y, pillar.x, pillar.y) < distanceThreshold;
             const p2Near = Phaser.Math.Distance.Between(this.player2.x, this.player2.y, pillar.x, pillar.y) < distanceThreshold;
             
-            // Player 1 places rune - ONLY if it matches the pillar index
+            // Player 1 places rune - ONLY if it matches the pillar
             if (p1Near && this.player1.carriedRune !== null) {
                 const wPressed = Phaser.Input.Keyboard.JustDown(this.wKey);
-                if (wPressed && this.player1.carriedRune === index) {
+                if (wPressed && runeToPillarMap[this.player1.carriedRune] === index) {
                     // Hide the rune that was placed
                     const placedRuneIndex = this.player1.carriedRune;
                     const placedRune = this.runes[placedRuneIndex];
@@ -1683,9 +2462,9 @@ export class Start extends Phaser.Scene {
                     pillar.hasRune = true;
                     pillar.owner = this.player1.faction;
                     
-                    // Set color based on the rune/pillar index (Gold, Cyan, or Orange-Red)
-                    const runeColors = [0xFFD700, 0x00FFFF, 0xFF4500];
-                    const targetColor = runeColors[index];
+            // Set color based on the rune that was placed (not pillar index)
+            const runeColors = [0xFF4500, 0x00FFFF, 0xFFD700]; // Orange (0), Cyan (1), Yellow (2)
+            const targetColor = runeColors[placedRuneIndex];
                     
                     pillar.setTint(targetColor); 
                     pillar.glow.setFillStyle(targetColor);
@@ -1701,10 +2480,10 @@ export class Start extends Phaser.Scene {
                 }
             }
             
-            // Player 2 places rune - ONLY if it matches the pillar index
+            // Player 2 places rune - ONLY if it matches the pillar
             if (p2Near && this.player2.carriedRune !== null) {
                 const upPressed = Phaser.Input.Keyboard.JustDown(this.upKey);
-                if (upPressed && this.player2.carriedRune === index) {
+                if (upPressed && runeToPillarMap[this.player2.carriedRune] === index) {
                     // Hide the rune that was placed
                     const placedRuneIndex = this.player2.carriedRune;
                     const placedRune = this.runes[placedRuneIndex];
@@ -1718,9 +2497,9 @@ export class Start extends Phaser.Scene {
                     pillar.hasRune = true;
                     pillar.owner = this.player2.faction;
                     
-                    // Set color based on the rune/pillar index (Gold, Cyan, or Orange-Red)
-                    const runeColors = [0xFFD700, 0x00FFFF, 0xFF4500];
-                    const targetColor = runeColors[index];
+                    // Set color based on the rune that was placed (not pillar index)
+                    const runeColors = [0xFF4500, 0x00FFFF, 0xFFD700]; // Orange (0), Cyan (1), Yellow (2)
+                    const targetColor = runeColors[placedRuneIndex];
                     
                     pillar.setTint(targetColor); 
                     pillar.glow.setFillStyle(targetColor);
@@ -1737,7 +2516,9 @@ export class Start extends Phaser.Scene {
             }
             
             // Visual feedback - show glow when player is near with the CORRECT rune
-            if ((p1Near && this.player1.carriedRune === index) || (p2Near && this.player2.carriedRune === index)) {
+            const p1HasCorrectRune = p1Near && this.player1.carriedRune !== null && runeToPillarMap[this.player1.carriedRune] === index;
+            const p2HasCorrectRune = p2Near && this.player2.carriedRune !== null && runeToPillarMap[this.player2.carriedRune] === index;
+            if (p1HasCorrectRune || p2HasCorrectRune) {
                 pillar.glow.setAlpha(0.4);
                 pillar.glow.setFillStyle(0xffff00); // Yellow hint
             } else if (!pillar.hasRune) {
@@ -2012,8 +2793,24 @@ export class Start extends Phaser.Scene {
         // Make sure other player's game is hidden
         if (player.faction === 'Solari') {
             this.hideSimonSays(this.simonSaysP2);
+            // Make sure player 2 is visible if they were in a puzzle
+            if (this.player2 && this.player2.teleporting) {
+                this.player2.setVisible(true);
+                this.player2.teleporting = false;
+                if (this.player2.body) {
+                    this.player2.body.enable = true;
+                }
+            }
         } else {
             this.hideSimonSays(this.simonSaysP1);
+            // Make sure player 1 is visible if they were in a puzzle
+            if (this.player1 && this.player1.teleporting) {
+                this.player1.setVisible(true);
+                this.player1.teleporting = false;
+                if (this.player1.body) {
+                    this.player1.body.enable = true;
+                }
+            }
         }
         
         // Reset game state for new session
@@ -2504,6 +3301,20 @@ export class Start extends Phaser.Scene {
             }
         }
         
+        // Safety check: ensure both players are visible
+        if (this.player1 && !this.player1.teleporting) {
+            this.player1.setVisible(true);
+            if (this.player1.body && !this.player1.body.enable) {
+                this.player1.body.enable = true;
+            }
+        }
+        if (this.player2 && !this.player2.teleporting) {
+            this.player2.setVisible(true);
+            if (this.player2.body && !this.player2.body.enable) {
+                this.player2.body.enable = true;
+            }
+        }
+        
         // Hide game UI
         this.hideSimonSays(game);
         
@@ -2540,7 +3351,8 @@ export class Start extends Phaser.Scene {
         player.teleporting = true;
         player.originalX = player.x;
         player.originalY = player.y;
-        player.setVisible(false);
+        // Keep player visible - don't despawn
+        // player.setVisible(false);
         player.body.enable = false;
         this.startLightsOut(game, player);
     }
@@ -2553,11 +3365,27 @@ export class Start extends Phaser.Scene {
                 this.lightsOutP2.container.setAlpha(0);
                 this.lightsOutP2.active = false;
             }
+            // Make sure player 2 is visible if they were in a puzzle
+            if (this.player2 && this.player2.teleporting) {
+                this.player2.setVisible(true);
+                this.player2.teleporting = false;
+                if (this.player2.body) {
+                    this.player2.body.enable = true;
+                }
+            }
         } else {
             if (this.lightsOutP1 && this.lightsOutP1.container) {
                 this.lightsOutP1.container.setVisible(false);
                 this.lightsOutP1.container.setAlpha(0);
                 this.lightsOutP1.active = false;
+            }
+            // Make sure player 1 is visible if they were in a puzzle
+            if (this.player1 && this.player1.teleporting) {
+                this.player1.setVisible(true);
+                this.player1.teleporting = false;
+                if (this.player1.body) {
+                    this.player1.body.enable = true;
+                }
             }
         }
         
@@ -2567,6 +3395,29 @@ export class Start extends Phaser.Scene {
         game.phase = 'intro';
         game.introTimer = 0;
         game.timer = 15; // Reset timer to 15 seconds
+        
+        // Initialize keys immediately when game starts
+        if (game.playerFaction === 'Solari') {
+            // Player 1: W, A, S, D, E
+            game.numKeys = {
+                'W': this.wKey,
+                'A': this.aKey,
+                'S': this.sKey,
+                'D': this.dKey,
+                'E': this.eKey
+            };
+            game.keyMap = { 'W': 0, 'A': 1, 'S': 2, 'D': 3, 'E': 4 };
+        } else {
+            // Player 2: Up, Down, Left, Right, / (slash)
+            game.numKeys = {
+                'UP': this.upKey,
+                'DOWN': this.downKey,
+                'LEFT': this.leftKey,
+                'RIGHT': this.rightKey,
+                'SLASH': this.slashKey
+            };
+            game.keyMap = { 'UP': 0, 'DOWN': 1, 'LEFT': 2, 'RIGHT': 3, 'SLASH': 4 };
+        }
         
         // Set target state - both want all vines in their color (ON)
         game.targetState = true;
@@ -2592,7 +3443,7 @@ export class Start extends Phaser.Scene {
     
     generateLightsOutPuzzle(game, currentOwner, playerFaction) {
         // Generate starting pattern based on ownership
-        const numVines = 7;
+        const numVines = 5; // Changed to 5 to match 5 keys per player
         const vineState = [];
         const vineToggled = [];
         
@@ -2627,11 +3478,20 @@ export class Start extends Phaser.Scene {
         const numVines = game.vines.length;
         const opponentOwns = game.currentOwner && game.currentOwner !== game.playerFaction;
         
+        // Passcode digits to display (0-9, cycling)
+        const digits = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
+        
         for (let i = 0; i < numVines; i++) {
             const vine = game.vines[i];
             if (!vine) continue;
             const isOn = game.vineState[i];
             vine.isOn = isOn;
+            
+            // Always show the digit text
+            if (vine.digitText) {
+                vine.digitText.setVisible(true);
+                vine.digitText.setText(digits[i % 10]); // Cycle through digits
+            }
             
             if (isOn) {
                 // If opponent owns it and player hasn't toggled this vine yet, show opponent's color
@@ -2639,14 +3499,30 @@ export class Start extends Phaser.Scene {
                 const color = (opponentOwns && !game.vineToggled[i]) 
                     ? game.opponentColor 
                     : game.onColor;
-                vine.setFillStyle(color);
-                vine.setStrokeStyle(2, 0xffffff); // White border always visible
-                vine.glow.setAlpha(0.8);
+                
+                // Show passcode display as active - bright and colored
+                vine.setTint(0xffffff); // White/neutral tint for active display
+                vine.glow.setFillStyle(color);
+                vine.glow.setAlpha(0.6);
+                
+                // Show digit text bright and colored (ON state)
+                if (vine.digitText) {
+                    const colorObj = Phaser.Display.Color.IntegerToColor(color);
+                    vine.digitText.setFill(colorObj.rgba);
+                    vine.digitText.setAlpha(1.0); // Fully visible
+                    vine.digitText.setStyle({ fontSize: '20px', fontStyle: 'bold' }); // Bright and bold
+                }
             } else {
-                // OFF = green (unowned or toggled off)
-                vine.setFillStyle(game.offColor);
-                vine.setStrokeStyle(2, 0xffffff); // White border always visible
+                // OFF = dark/unlit (unowned or toggled off)
+                vine.setTint(0x333333); // Dark tint for inactive display
                 vine.glow.setAlpha(0);
+                
+                // Show digit text dimmed (OFF state)
+                if (vine.digitText) {
+                    vine.digitText.setFill('#666666'); // Dark gray for off state
+                    vine.digitText.setAlpha(0.4); // Dimmed
+                    vine.digitText.setStyle({ fontSize: '18px', fontStyle: 'normal' }); // Smaller and not bold
+                }
             }
         }
     }
@@ -2874,49 +3750,90 @@ export class Start extends Phaser.Scene {
                 return;
             }
             
-            // Initialize number keys if not already done
+            // Keys should already be initialized in startLightsOut, but check just in case
             if (!game.numKeys) {
                 if (game.playerFaction === 'Solari') {
-                    // Player 1: Keys 1-6
+                    // Player 1: W, A, S, D, E
                     game.numKeys = {
-                        '1': this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ONE),
-                        '2': this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.TWO),
-                        '3': this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.THREE),
-                        '4': this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.FOUR),
-                        '5': this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.FIVE),
-                        '6': this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SIX)
+                        'W': this.wKey,
+                        'A': this.aKey,
+                        'S': this.sKey,
+                        'D': this.dKey,
+                        'E': this.eKey
                     };
-                    game.keyMap = { '1': 0, '2': 1, '3': 2, '4': 3, '5': 4, '6': 5 };
+                    game.keyMap = { 'W': 0, 'A': 1, 'S': 2, 'D': 3, 'E': 4 };
                 } else {
-                    // Player 2: Keys 5-0 (5, 6, 7, 8, 9, 0)
+                    // Player 2: Up, Down, Left, Right, / (slash)
                     game.numKeys = {
-                        '5': this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.FIVE),
-                        '6': this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SIX),
-                        '7': this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SEVEN),
-                        '8': this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.EIGHT),
-                        '9': this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.NINE),
-                        '0': this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ZERO)
+                        'UP': this.upKey,
+                        'DOWN': this.downKey,
+                        'LEFT': this.leftKey,
+                        'RIGHT': this.rightKey,
+                        'SLASH': this.slashKey
                     };
-                    game.keyMap = { '5': 0, '6': 1, '7': 2, '8': 3, '9': 4, '0': 5 };
+                    game.keyMap = { 'UP': 0, 'DOWN': 1, 'LEFT': 2, 'RIGHT': 3, 'SLASH': 4 };
                 }
             }
             
-            // Check for number key presses
-            for (const [key, vineIndex] of Object.entries(game.keyMap)) {
-                if (Phaser.Input.Keyboard.JustDown(game.numKeys[key])) {
-                    // Check if game is still active (might have been ended by punishment)
-                    if (!game.active || game.phase !== 'playing') {
-                        break;
+            // Check for key presses
+            if (game.playerFaction === 'Solari') {
+                // Player 1: W, A, S, D, E
+                if (Phaser.Input.Keyboard.JustDown(game.numKeys['W'])) {
+                    if (game.active && game.phase === 'playing') {
+                        this.toggleLightsOutVine(game, game.keyMap['W']);
                     }
-                    
-                    this.toggleLightsOutVine(game, vineIndex);
-                    
-                    // Check if punishment was triggered (game ended)
-                    if (!game.active || game.phase !== 'playing') {
-                        break;
+                }
+                if (Phaser.Input.Keyboard.JustDown(game.numKeys['A'])) {
+                    if (game.active && game.phase === 'playing') {
+                        this.toggleLightsOutVine(game, game.keyMap['A']);
                     }
-                    
-                    // Check for win condition (all vines in player's color)
+                }
+                if (Phaser.Input.Keyboard.JustDown(game.numKeys['S'])) {
+                    if (game.active && game.phase === 'playing') {
+                        this.toggleLightsOutVine(game, game.keyMap['S']);
+                    }
+                }
+                if (Phaser.Input.Keyboard.JustDown(game.numKeys['D'])) {
+                    if (game.active && game.phase === 'playing') {
+                        this.toggleLightsOutVine(game, game.keyMap['D']);
+                    }
+                }
+                if (Phaser.Input.Keyboard.JustDown(game.numKeys['E'])) {
+                    if (game.active && game.phase === 'playing') {
+                        this.toggleLightsOutVine(game, game.keyMap['E']);
+                    }
+                }
+            } else {
+                // Player 2: Up, Down, Left, Right, /
+                if (Phaser.Input.Keyboard.JustDown(game.numKeys['UP'])) {
+                    if (game.active && game.phase === 'playing') {
+                        this.toggleLightsOutVine(game, game.keyMap['UP']);
+                    }
+                }
+                if (Phaser.Input.Keyboard.JustDown(game.numKeys['DOWN'])) {
+                    if (game.active && game.phase === 'playing') {
+                        this.toggleLightsOutVine(game, game.keyMap['DOWN']);
+                    }
+                }
+                if (Phaser.Input.Keyboard.JustDown(game.numKeys['LEFT'])) {
+                    if (game.active && game.phase === 'playing') {
+                        this.toggleLightsOutVine(game, game.keyMap['LEFT']);
+                    }
+                }
+                if (Phaser.Input.Keyboard.JustDown(game.numKeys['RIGHT'])) {
+                    if (game.active && game.phase === 'playing') {
+                        this.toggleLightsOutVine(game, game.keyMap['RIGHT']);
+                    }
+                }
+                if (Phaser.Input.Keyboard.JustDown(game.numKeys['SLASH'])) {
+                    if (game.active && game.phase === 'playing') {
+                        this.toggleLightsOutVine(game, game.keyMap['SLASH']);
+                    }
+                }
+            }
+            
+            // Check if puzzle is complete after any toggle
+            if (game.active && game.phase === 'playing') {
                     if (this.checkLightsOutComplete(game)) {
                         game.phase = 'done';
                         game.completed = true;
@@ -2931,8 +3848,6 @@ export class Start extends Phaser.Scene {
                             game.statusText.setAlpha(1);
                         }
                         this.time.delayedCall(2000, () => this.endLightsOut(game, true));
-                    }
-                    break;
                 }
             }
         }
@@ -2948,6 +3863,20 @@ export class Start extends Phaser.Scene {
                 player.body.enable = true;
                 player.body.setAllowGravity(true);
                 player.body.setVelocity(0, 0);
+            }
+        }
+        
+        // Safety check: ensure both players are visible
+        if (this.player1 && !this.player1.teleporting) {
+            this.player1.setVisible(true);
+            if (this.player1.body && !this.player1.body.enable) {
+                this.player1.body.enable = true;
+            }
+        }
+        if (this.player2 && !this.player2.teleporting) {
+            this.player2.setVisible(true);
+            if (this.player2.body && !this.player2.body.enable) {
+                this.player2.body.enable = true;
             }
         }
         
