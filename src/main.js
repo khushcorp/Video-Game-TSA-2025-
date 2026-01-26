@@ -36,10 +36,10 @@ const config = {
         Volcano
     ],
     scale: {
-        mode: Phaser.Scale.RESIZE, // Scale the game to fill the window
+        mode: Phaser.Scale.SHOW_ALL, // Maintain aspect ratio, show all content
         autoCenter: Phaser.Scale.CENTER_BOTH,
-        width: '100%',
-        height: '100%',
+        width: gameWidth,
+        height: gameHeight,
         parent: 'game-container'
     },
 };

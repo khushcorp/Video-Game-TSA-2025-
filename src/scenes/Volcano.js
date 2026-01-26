@@ -20,42 +20,26 @@ export class Volcano extends Phaser.Scene {
         // Center camera on the level
         this.cameras.main.setBounds(0, 0, worldWidth, worldHeight);
         this.cameras.main.centerOn(worldWidth / 2, worldHeight / 2);
+        // Add extra visible space at the top without moving gameplay
+        this.topCameraPadding = 120;
+        this.applyTopCameraPadding();
+        this.scale.on('resize', this.applyTopCameraPadding, this);
         
         // ===== BACKGROUND =====
         this.createBackground();
-        
-        // Lava glow effects - adjusted for new ground position
-        for (let i = 0; i < 5; i++) {
-            const glow = this.add.circle(200 + i * 220, 680, 50 + Math.random() * 30, 0xFF4500, 0.3);
-            this.tweens.add({
-                targets: glow,
-                alpha: { from: 0.3, to: 0.6 },
-                duration: 1000 + Math.random() * 1000,
-                yoyo: true,
-                repeat: -1
-            });
-        }
         
         // ===== INFLUENCE BARS UI (screen-anchored) =====
         this.player1Influence = 0;
         this.player2Influence = 0;
         this.maxInfluence = 500;
         
-        const uiPadding = 320;
-        this.player1BarBg = this.add.rectangle(uiPadding, 30, 400, 30, 0x333333);
-        this.player1BarBg.setOrigin(0.5, 0.5);
-        this.player1BarFill = this.add.rectangle(uiPadding - 200, 30, 0, 25, 0xFFD700);
-        this.player1BarFill.setOrigin(0, 0.5);
-        this.player1InfluenceText = this.add.text(uiPadding, 55, '0/500', { fontSize: '14px', fill: '#ffffff', resolution: 2 }).setOrigin(0.5, 0.5).setDepth(10000);
-        this.player1NameText = this.add.text(uiPadding, 75, 'SOLARI', { fontSize: '18px', fill: '#FFD700', fontStyle: 'bold', resolution: 2 }).setOrigin(0.5, 0.5).setDepth(10000);
+        // HARDCODED: Per-second influence rates (stack and persist until next event)
+        // Note: Rates can be negative (losing influence/sec), but actual influence is clamped to >= 0
+        this.player1InfluenceRate = 0;
+        this.player2InfluenceRate = 0;
         
-        const p2X = 1280 - uiPadding;
-        this.player2BarBg = this.add.rectangle(p2X, 30, 400, 30, 0x333333);
-        this.player2BarBg.setOrigin(0.5, 0.5);
-        this.player2BarFill = this.add.rectangle(p2X - 200, 30, 0, 25, 0x8B00FF);
-        this.player2BarFill.setOrigin(0, 0.5);
-        this.player2InfluenceText = this.add.text(p2X, 55, '0/500', { fontSize: '14px', fill: '#ffffff', resolution: 2 }).setOrigin(0.5, 0.5).setDepth(10000);
-        this.player2NameText = this.add.text(p2X, 75, 'UMBRAE', { fontSize: '18px', fill: '#8B00FF', fontStyle: 'bold', resolution: 2 }).setOrigin(0.5, 0.5).setDepth(10000);
+        this.player1BarUi = this.createInfluenceBar(260, 40, 0xFFD700, 'Solari', false);
+        this.player2BarUi = this.createInfluenceBar(2000, 40, 0x8B00FF, 'Umbrae', true);
         
         // Influence map blocks
         this.solariTerritoryBlocks = [];
@@ -73,10 +57,12 @@ export class Volcano extends Phaser.Scene {
         this.baseJumpVelocity = -550;
         
         // ===== RISING LAVA MECHANIC =====
-        this.lavaRiseStartTime1 = 20; 
-        this.lavaRiseActualStart1 = 30; 
-        this.lavaRiseStartTime2 = 200; 
-        this.lavaRiseActualStart2 = 210; 
+        // Lava events at 4:30 remaining (30s elapsed) and 1:30 remaining (210s elapsed)
+        // Warning is 10s before each event: 4:40 and 1:40 remaining
+        this.lavaRiseStartTime1 = 20; // Warning at 4:40 remaining
+        this.lavaRiseActualStart1 = 30; // Event at 4:30 remaining
+        this.lavaRiseStartTime2 = 200; // Warning at 1:40 remaining
+        this.lavaRiseActualStart2 = 210; // Event at 1:30 remaining
         this.lavaRiseWarningDuration = 10; 
         this.lavaRiseDuration = 80; 
         this.lavaRiseTimer = 0;
@@ -86,6 +72,10 @@ export class Volcano extends Phaser.Scene {
         this.lavaSurvivalChecked = false; 
         this.lavaEndTime = 0; 
         this.lavaEventNumber = 0; 
+        this.lavaEvent1WarningShown = false;
+        this.lavaEvent2WarningShown = false;
+        this.lavaEvent1Triggered = false;
+        this.lavaEvent2Triggered = false;
         
         this.lavaStartY = this.HARDCODED_GROUND_TOP; // Dynamic ground top
         this.lavaTopY = 0; 
@@ -94,8 +84,8 @@ export class Volcano extends Phaser.Scene {
         this.lavaGlow = null;
         this.lavaParticles = [];
         
-        // Lava warning timer text
-        this.lavaWarningText = this.add.text(1280 / 2, 100, '', {
+        // Lava warning timer text (centered at top)
+        this.lavaWarningText = this.add.text(1280 / 2, 50, '', {
             fontSize: '48px',
             fill: '#FF4500',
             fontStyle: 'bold',
@@ -107,7 +97,17 @@ export class Volcano extends Phaser.Scene {
         // Player debuff flags (for lava damage)
         this.player1LavaDebuff = false;
         this.player2LavaDebuff = false;
+        this.player1FellInLava = false;
+        this.player2FellInLava = false;
+        this.player1Respawned = true;
+        this.player2Respawned = true;
+        // HARDCODED: Freeze players only while lava message is visible
+        this.playersFrozenForLavaMessage = false;
+        this.messageUnfreezeTime = 0; // Track when message disappeared
         this.gravity = 600;
+        
+        // Track player alive state for lava minigame
+        this.playerAlive = { 1: true, 2: true };
         
         // Set physics world gravity
         this.physics.world.gravity.y = this.gravity;
@@ -123,41 +123,62 @@ export class Volcano extends Phaser.Scene {
         // ===== LAVA JUMP ORBS (Strategic placement) =====
         this.lavaOrbs = [];
         const orbPositions = [
-            { x: 250, y: 500 },   // Left ascent start
-            { x: 1030, y: 500 },  // Right ascent start
-            { x: 640, y: 420 },   // Center gap crosser
-            { x: 400, y: 280 },   // Upper left path
-            { x: 880, y: 280 },   // Upper right path
-            { x: 640, y: 150 },   // Final summit boost
+            { x: 1550, y:  350},   // Left ascent start
+            { x: 1500, y: 600 },  // Right ascent start
+            { x: 695, y: 620 },   // Center gap crosser
+            { x: 1300, y: 220 },   // Upper left path
+            { x: 429, y: 360 },   // Upper right path
+            { x: 1120, y: 700 },   // Final summit boost
         ];
         
         orbPositions.forEach((pos, index) => {
-            const orbGlow = this.add.circle(pos.x, pos.y, 30, 0xFF6347, 0.3).setDepth(5);
-            const orbBody = this.add.circle(pos.x, pos.y, 20, 0xFF4500, 0.9).setDepth(6);
-            const orbCore = this.add.circle(pos.x, pos.y, 10, 0xFFD700, 1.0).setDepth(7);
+            const orbGlow = this.add.circle(pos.x, pos.y, 32, 0xFF6347, 0.35).setDepth(5);
+            const orbBody = this.add.circle(pos.x, pos.y, 20, 0xFF4500, 0.95).setDepth(6);
+            const orbCore = this.add.circle(pos.x, pos.y, 12, 0xFFD700, 1.0).setDepth(7);
+
             
             this.tweens.add({
-                targets: [orbGlow, orbBody, orbCore],
-                y: { from: pos.y - 5, to: pos.y + 5 },
+                targets: [orbGlow],
+                scale: { from: 0.95, to: 1.05 },
+                alpha: { from: 0.25, to: 0.55 },
+                duration: 1600 + Math.random() * 600,
+                yoyo: true,
+                repeat: -1,
+                ease: 'Sine.easeInOut'
+            });
+            this.tweens.add({
+                targets: [orbBody, orbCore],
+                y: { from: pos.y - 4, to: pos.y + 4 },
                 duration: 1500 + Math.random() * 500,
                 yoyo: true,
                 repeat: -1,
                 ease: 'Sine.easeInOut'
             });
             
-            const chargeTimerText = this.add.text(pos.x, pos.y - 40, '', {
+            const chargeTimerText = this.add.text(pos.x, pos.y - 44, '', {
                 fontSize: '16px', fill: '#ffffff', fontStyle: 'bold', stroke: '#000000', strokeThickness: 3, resolution: 2
             }).setOrigin(0.5, 0.5).setDepth(10000).setVisible(false);
             
             this.lavaOrbs.push({
-                x: pos.x, y: pos.y, glow: orbGlow, body: orbBody, core: orbCore,
-                chargeTimerText: chargeTimerText, isCharged: true, isOnCooldown: false,
-                chargeTimer: 0, chargeTime: 5.0, cooldownTimer: 0, cooldownTime: 0.5,
-                boostPower: -750, radius: 25, originalColors: { glow: 0xFF6347, body: 0xFF4500, core: 0xFFD700 }
+                x: pos.x,
+                y: pos.y,
+                glow: orbGlow,
+                body: orbBody,
+                core: orbCore,
+                chargeTimerText: chargeTimerText,
+                isCharged: true,
+                isOnCooldown: false,
+                chargeTimer: 0,
+                chargeTime: 5.0,
+                cooldownTimer: 0,
+                cooldownTime: 0.5,
+                boostPower: -750,
+                radius: 25,
+                originalColors: { glow: 0xFF6347, body: 0xFF4500, core: 0xFFD700 }
             });
         });
 
-        const romanNumerals = ['I','II','III','IV','V','VI','VII','VIII'];
+        const romanNumerals = ['I','II','III','IV','V','VI','VII'];
         const labelOrder = Phaser.Utils.Array.Shuffle(romanNumerals.slice());
         this.orbSequenceIndices = Phaser.Utils.Array.Shuffle([0,1,2,3,4,5]); // Only 6 orbs now
         this.orbSequenceNumerals = this.orbSequenceIndices.map(i => labelOrder[i]);
@@ -173,9 +194,15 @@ export class Volcano extends Phaser.Scene {
         this.lavaOrbs.forEach((orb, i) => {
             const numeral = labelOrder[i];
             orb.romanNumeral = numeral;
-            orb.romanText = this.add.text(orb.x, orb.y + 40, numeral, {
-                fontSize: '20px', fill: '#FFFFFF', fontStyle: 'bold', stroke: '#000000', strokeThickness: 3, resolution: 2
-            }).setOrigin(0.5, 0.5).setDepth(10000);
+            orb.romanText = this.add.text(orb.x, orb.y + 1, numeral, {
+                fontSize: '18px',
+                fill: '#FFE9B0',
+                fontStyle: 'bold',
+                stroke: '#7A1200',
+                strokeThickness: 4,
+                resolution: 2,
+                shadow: { offsetX: 0, offsetY: 0, color: '#FFB84A', blur: 12, fill: true }
+            }).setOrigin(0.5, 0.5).setDepth(8);
         });
         
         // ===== PLATFORMS (Ascent Design) =====
@@ -361,7 +388,7 @@ export class Volcano extends Phaser.Scene {
         const groundX = 900;
         const groundY = 1050;
         const groundWidth = 2690;
-        const groundHeight = 225;
+        const groundHeight = 250;
         
         // Ground using Magma Texture
         const ground = this.add.tileSprite(groundX, groundY, groundWidth, groundHeight, 'magma-platform');
@@ -378,61 +405,101 @@ export class Volcano extends Phaser.Scene {
         this.scales = [];
         this.solariScaleCount = 0;
         this.umbraeScaleCount = 0;
+        this.debrisPieces = [];
         
         // Create lava (adjusted for new ground)
+        // HARDCODED: Lava depth must be higher than faultline indicators (10000) and roman numerals (10000) to cover them
         this.time.delayedCall(100, () => {
             const lavaStartY = this.HARDCODED_GROUND_TOP; 
             this.lavaStartY = lavaStartY;
             this.lavaCurrentY = lavaStartY;
-            this.lava = this.add.rectangle(1280/2, lavaStartY, 2000, 0, 0xFF4500).setOrigin(0.5, 1.0).setDepth(999).setVisible(false);
-            this.lavaGlow = this.add.rectangle(1280/2, lavaStartY, 2000, 50, 0xFF6347).setOrigin(0.5, 0.5).setDepth(1000).setVisible(false);
+            this.lava = this.add.rectangle(1280/2, lavaStartY, 3500, 0, 0xFF4500).setOrigin(0.5, 1.0).setDepth(10001).setVisible(false);
+            this.lavaGlow = this.add.rectangle(1280/2, lavaStartY, 3500, 50, 0xFF6347).setOrigin(0.5, 0.5).setDepth(10002).setVisible(false);
+            this.lavaEdgeGlow = this.add.rectangle(1280/2, lavaStartY, 3500, 18, 0xFFB347, 0.65).setOrigin(0.5, 1.0).setDepth(10002.5).setVisible(false);
             this.lavaParticles = [];
-            for (let i = 0; i < 20; i++) {
-                const particle = this.add.circle(100 + (i * 60), lavaStartY - 100, 8, 0xFFD700, 1.0).setDepth(1001).setVisible(false);
+            this.lavaParticleData = [];
+            const particleCount = 36;
+            for (let i = 0; i < particleCount; i++) {
+                const particle = this.add.circle(0, 0, 6, 0xFFB347, 1.0).setDepth(10003).setVisible(false);
                 this.lavaParticles.push(particle);
+                this.lavaParticleData.push({
+                    vx: 0,
+                    vy: 0,
+                    life: 0,
+                    maxLife: 0,
+                    baseRadius: 6,
+                    isLarge: false
+                });
+            }
+            this.lavaSurfaceSegments = [];
+            this.lavaSurfaceCrust = [];
+            this.lavaSurfaceHighlights = [];
+            const segmentCount = 38;
+            const segmentWidth = 3500 / segmentCount;
+            const leftEdge = 640 - (3500 / 2);
+            for (let i = 0; i < segmentCount; i++) {
+                const baseHeight = Phaser.Math.Between(6, 14);
+                const x = leftEdge + (segmentWidth * i) + (segmentWidth / 2);
+                const surface = this.add.rectangle(x, lavaStartY, segmentWidth + 6, baseHeight, 0xFF6A00).setOrigin(0.5, 1.0).setDepth(10002.2).setVisible(false);
+                const crust = this.add.rectangle(x, lavaStartY, segmentWidth + 6, 3, 0x7A1F00).setOrigin(0.5, 1.0).setDepth(10002.3).setVisible(false);
+                const highlight = this.add.rectangle(x, lavaStartY - baseHeight + 2, segmentWidth * 0.4, 2, 0xFFD166).setOrigin(0.5, 1.0).setDepth(10002.4).setVisible(false);
+                this.lavaSurfaceSegments.push({
+                    rect: surface,
+                    baseHeight,
+                    amp: Phaser.Math.Between(2, 6),
+                    phase: Phaser.Math.FloatBetween(0, Math.PI * 2),
+                    offset: Phaser.Math.Between(-4, 4)
+                });
+                this.lavaSurfaceCrust.push(crust);
+                this.lavaSurfaceHighlights.push(highlight);
             }
         });
         
         // New Parkour Platform Data (Ascent path)
         const platformData = [
             // Tier 1 (Low)
-            { x: 1950, y: 860, w: 150, h: 20, falling: false },
+            { x: 1950, y: 830, w: 150, h: 20, falling: false },
             { x: 1700, y: 747, w: 150, h: 20, falling: false },
             { x: 1975, y: 630, w: 225, h: 20, falling: false }, // Central start
             
             // Tier 2 (Mid-Low)
-            { x: 1200, y: 550, w: 120, h: 20, falling: true },
-            { x: 880, y: 450, w: 120, h: 20, falling: true },
-            { x: 640, y: 400, w: 150, h: 20, falling: false }, // Drum platform
+            { x: 1837, y: 250, w: 120, h: 20, falling: true },
+            { x: 1837, y: 250, w: 120, h: 20, falling: true },
+
             
             // Tier 3 (Mid-High)
-            { x: 250, y: 350, w: 100, h: 20, falling: false },
-            { x: 1030, y: 350, w: 100, h: 20, falling: false },
-            { x: 500, y: 300, w: 120, h: 20, falling: true },
-            { x: 780, y: 300, w: 120, h: 20, falling: true },
+            { x: 1132, y: 350, w: 130, h: 20, falling: false },
+            { x: 911, y: 725, w: 120, h: 20, falling: true },
+            { x: 1350, y: 725, w: 120, h: 20, falling: true },
             
             // Tier 4 (High)
-            { x: 640, y: 220, w: 180, h: 20, falling: false },
-            { x: 350, y: 180, w: 100, h: 20, falling: false },
-            { x: 930, y: 180, w: 100, h: 20, falling: false },
+            { x: 550, y: 200, w: 120, h: 20, falling: false },
             
             // Tier 5 (Peak)
-            { x: 640, y: 100, w: 250, h: 20, falling: false },
+            { x: 150, y: 605, w: 120, h: 20, falling: false },
 
             // Additional Manual Platforms (Move these manually)
-            { x: 200, y: 850, w: 120, h: 20, falling: false },
-            { x: 1080, y: 850, w: 120, h: 20, falling: false },
-            { x: 300, y: 650, w: 120, h: 20, falling: false },
-            { x: 980, y: 650, w: 120, h: 20, falling: false },
-            { x: 150, y: 450, w: 120, h: 20, falling: false },
-            { x: 1130, y: 450, w: 120, h: 20, falling: false },
-            { x: 500, y: 200, w: 120, h: 20, falling: false },
-            { x: 780, y: 200, w: 120, h: 20, falling: false },
+            { x: 550, y: 830, w: 120, h: 20, falling: false },
+            { x: 1120, y: 830, w: 120, h: 20, falling: false },
+            { x: 980, y: 550, w: 120, h: 20, falling: false },
+            { x: 1280, y: 550, w: 120, h: 20, falling: false },
+            { x: 1130, y: 450, w: 310, h: 20, falling: false },
+            { x: 325, y: 200, w: 120, h: 20, falling: false },
+            { x: 325, y: 725, w: 120, h: 20, falling: true },
+            { x: 850, y: 500, w: 120, h: 20, falling: true },
+            { x: 850, y: 200, w: 120, h: 20, falling: true },
+
+
+
+            // DRUM STEEL PLATE PLATFORMS (Move these manually)
+            { x: 1135, y: 125, w: 150, h: 20, falling: false, isDrum: true },
+            { x: 1700, y: 530, w: 150, h: 20, falling: false, isDrum: true },
+            { x: 425, y: 500, w: 150, h: 20, falling: false, isDrum: true },
         ];
         
         platformData.forEach((data) => {
             let platform;
-            const isDrum = (data.x === 400 && data.y === 750) || (data.x === 1080 && data.y === 550) || (data.x === 640 && data.y === 400);
+            const isDrum = data.isDrum || false;
             
             if (data.falling) {
                 // Falling platforms use the new unstable fiery magma texture
@@ -451,10 +518,14 @@ export class Volcano extends Phaser.Scene {
             if (data.falling) {
                 platform.isFalling = false;
                 platform.fallTimer = 0;
+                platform.fallActivated = false;
+                platform.breakTriggered = false;
                 platform.originalX = data.x;
                 platform.originalY = data.y;
                 platform.playersOnPlatform = new Set();
                 platform.colliders = [];
+                platform.crackLight = null;
+                platform.crackHeavy = null;
                 this.fallingPlatforms.push(platform);
             }
         });
@@ -497,24 +568,40 @@ export class Volcano extends Phaser.Scene {
             this.textures.get('ladder-pixel').setFilter(Phaser.Textures.FilterMode.NEAREST);
         }
 
-        const leftLadder = this.add.tileSprite(100, 400, 32, 480, 'ladder-pixel').setOrigin(0.5, 0.5);
-        this.vines.push(leftLadder);
-        
-        const rightLadder = this.add.tileSprite(1180, 400, 32, 480, 'ladder-pixel').setOrigin(0.5, 0.5);
-        this.vines.push(rightLadder);
+        const ladderData = [
+            { x: 105, y: 407, w: 32, h: 380 },
+            { x: 2072, y: 414, w: 32, h: 410 },
+            { x: 320, y: 95, w: 32, h: 200 },
+            { x: 1837, y: 115, w: 32, h: 250 }
+        ];
+
+        ladderData.forEach(data => {
+            const ladder = this.add.tileSprite(data.x, data.y, data.w, data.h, 'ladder-pixel').setOrigin(0.5, 0.5);
+            this.vines.push(ladder);
+        });
         
         // ===== DRUM PLATES (Mechanic) =====
         // Connect the mechanics to the new platform positions
-        const drumPlateTargets = [
-            { x: 400, y: 750 },
-            { x: 640, y: 400 },
-            { x: 1080, y: 550 }
-        ];
+        const drumPlateTargets = platformData
+            .filter(d => d.isDrum)
+            .map(d => ({ x: d.x, y: d.y }));
         
+        const pillarPlatform = platformData.find(p => p.x === 1130 && p.y === 450 && p.w === 310 && !p.falling);
+        const pillarPositions = drumPlateTargets.map((pos, index) => {
+            if (!pillarPlatform) return pos;
+            const halfBase = 15; // base width is 30
+            const leftX = pillarPlatform.x - (pillarPlatform.w / 2) + halfBase;
+            const rightX = pillarPlatform.x + (pillarPlatform.w / 2) - halfBase;
+            const midX = pillarPlatform.x;
+            const xPositions = [leftX, midX, rightX];
+            return { x: xPositions[index] ?? midX, y: pillarPlatform.y };
+        });
+
         this.scales = [];
-        drumPlateTargets.forEach((pos, index) => {
+        pillarPositions.forEach((pos, index) => {
             const x = pos.x;
-            const baseY = pos.y - 10;
+            const platformTop = pillarPlatform ? (pillarPlatform.y - pillarPlatform.h / 2) : pos.y - 10;
+            const baseY = platformTop - 10;
             const fillMax = 60;
             
             const base = this.add.rectangle(x, baseY + 10, 30, 10, 0x444444).setOrigin(0.5, 1.0).setDepth(3);
@@ -534,13 +621,21 @@ export class Volcano extends Phaser.Scene {
         drumPlateTargets.forEach(target => {
             const plat = this.platforms.find(p => Math.abs(p.x - target.x) < 1 && Math.abs(p.y - target.y) < 1);
             // Push the result even if null to keep array indices matched with drumPlateTargets/scales
-            this.faultlinePlates.push(plat ? { body: plat } : null);
+            this.faultlinePlates.push(plat ? {
+                body: plat,
+                originalY: plat.y,
+                isPressed: false,
+                pressTween: null
+            } : null);
         });
         
         // ===== PLAYERS =====
-        const spawnY = 910; 
+        const spawnY = 900; 
         
-        this.player1 = this.add.rectangle(400, spawnY, 50, 50, 0xFFD700).setOrigin(0.5, 0.5);
+        this.player1Spawn = { x: 400, y: spawnY };
+        this.player2Spawn = { x: 880, y: spawnY };
+
+        this.player1 = this.add.rectangle(this.player1Spawn.x, this.player1Spawn.y, 50, 50, 0xFFD700).setOrigin(0.5, 0.5);
         this.physics.add.existing(this.player1);
         // REMOVED setCollideWorldBounds(true) - This was another "invisible barrier" forcing players up
         this.player1.body.setSize(50, 50).setGravityY(this.gravity);
@@ -553,7 +648,7 @@ export class Volcano extends Phaser.Scene {
         this.player1.vineLatchCooldown = 0;
         this.player1.vineClimbSpeed = this.climbSpeed;
         
-        this.player2 = this.add.rectangle(880, spawnY, 50, 50, 0x8B00FF).setOrigin(0.5, 0.5);
+        this.player2 = this.add.rectangle(this.player2Spawn.x, this.player2Spawn.y, 50, 50, 0x8B00FF).setOrigin(0.5, 0.5);
         this.physics.add.existing(this.player2);
         // REMOVED setCollideWorldBounds(true) - This was another "invisible barrier" forcing players up
         this.player2.body.setSize(50, 50).setGravityY(this.gravity);
@@ -597,7 +692,7 @@ export class Volcano extends Phaser.Scene {
         // ===== LEVEL TIMER =====
         this.levelTime = 0;
         this.levelDuration = 300;
-        this.timeText = this.add.text(1280 / 2, 50, '5:00', { fontSize: '24px', fill: '#ffffff', resolution: 2 }).setOrigin(0.5, 0.5).setDepth(10000);
+        this.timeText = this.add.text(1135, -30, '5:00', { fontSize: '32px', fill: '#ffffff', resolution: 2 }).setOrigin(0.5, 0.5).setDepth(10000);
         
         // ===== INFLUENCE SYSTEM =====
         this.influenceRate = 0;
@@ -676,9 +771,54 @@ export class Volcano extends Phaser.Scene {
             // Stop movement during countdown
             if (this.player1 && this.player1.body) this.player1.body.setVelocity(0, 0);
             if (this.player2 && this.player2.body) this.player2.body.setVelocity(0, 0);
+            this.updateLavaOrbs(delta / 1000);
             return;
         }
         const dt = delta / 1000;
+        
+        // DEBUG: Monitor player positions if they're not at spawn when they should be
+        if (this.lavaEndTime > 0 && this.levelTime - this.lavaEndTime < 3.0) {
+            const spawnX1 = this.player1Spawn.x;
+            const spawnX2 = this.player2Spawn.x;
+            const spawnY = this.player1Spawn.y;
+            if (this.player1 && (Math.abs(this.player1.x - spawnX1) > 10 || Math.abs(this.player1.y - spawnY) > 10)) {
+                console.log(`[MONITOR] Player1 NOT at spawn! Current: (${this.player1.x}, ${this.player1.y}), Expected: (${spawnX1}, ${spawnY})`);
+            }
+            if (this.player2 && (Math.abs(this.player2.x - spawnX2) > 10 || Math.abs(this.player2.y - spawnY) > 10)) {
+                console.log(`[MONITOR] Player2 NOT at spawn! Current: (${this.player2.x}, ${this.player2.y}), Expected: (${spawnX2}, ${spawnY})`);
+            }
+        }
+        
+        // HARDCODED: Freeze players while lava message is visible - force position every frame
+        // CRITICAL: This must run FIRST before any other code can move players
+        if (this.playersFrozenForLavaMessage) {
+            const spawnX1 = this.player1Spawn.x;
+            const spawnX2 = this.player2Spawn.x;
+            const spawnY = this.player1Spawn.y;
+            
+            // AGGRESSIVE: Force position on both game object AND body every single frame
+            // ALWAYS disable bodies - don't check, just force disable
+            if (this.player1) {
+                this.player1.x = spawnX1;
+                this.player1.y = spawnY;
+                if (this.player1.body) {
+                    // ALWAYS disable body during freeze - no checking
+                    this.player1.body.setEnable(false);
+                    this.player1.body.x = spawnX1;
+                    this.player1.body.y = spawnY;
+                }
+            }
+            if (this.player2) {
+                this.player2.x = spawnX2;
+                this.player2.y = spawnY;
+                if (this.player2.body) {
+                    // ALWAYS disable body during freeze - no checking
+                    this.player2.body.setEnable(false);
+                    this.player2.body.x = spawnX2;
+                    this.player2.body.y = spawnY;
+                }
+            }
+        }
         
         // HARDCODED: Update orb boost timers
         if (this.player1OrbBoostTimer > 0) {
@@ -690,33 +830,45 @@ export class Volcano extends Phaser.Scene {
             if (this.player2OrbBoostTimer < 0) this.player2OrbBoostTimer = 0;
         }
         
-        // HARDCODED: Skip ground correction for 0.5 seconds after lava ends to prevent teleporting into ground
-        const timeSinceLavaEnd = this.lavaEndTime > 0 ? this.levelTime - this.lavaEndTime : 999;
-        const skipGroundCorrection = this.lavaSurvivalChecked && timeSinceLavaEnd < 0.5;
+        // HARDCODED: Skip ground correction if players are frozen for message or for 1 second after lava ends
+        // Extended time to prevent players from being moved by ground correction after teleporting to spawn
+        const timeSinceLavaEndCheck = this.lavaEndTime > 0 ? this.levelTime - this.lavaEndTime : 999;
+        const skipGroundCorrection = this.playersFrozenForLavaMessage || (this.lavaSurvivalChecked && timeSinceLavaEndCheck < 1.0);
         
         // Only force players to ground position if they're actually on the ground platform
-        // Check if player is near ground level (within 50 pixels of ground top)
+        // HARDCODED: Skip ground correction for players who have fallen into lava
         if (!skipGroundCorrection) {
             const groundTop = this.groundTop;
-            const playerBottom1 = this.player1.y + this.HARDCODED_PLAYER_HALF_HEIGHT;
-            const playerBottom2 = this.player2.y + this.HARDCODED_PLAYER_HALF_HEIGHT;
-            const isOnGround1 = this.player1.body.touching.down && Math.abs(playerBottom1 - groundTop) < 50;
-            const isOnGround2 = this.player2.body.touching.down && Math.abs(playerBottom2 - groundTop) < 50;
             
-            // Only correct position if player is actually on the ground AND not falling
-            // This prevents forcing player into ground when falling from high heights
-            if (isOnGround1 && Math.abs(this.player1.body.velocity.y) < 10 && this.player1OrbBoostTimer === 0) {
-                const expectedY = groundTop - this.HARDCODED_PLAYER_HALF_HEIGHT;
-                // Only correct if player is very close to expected position (within 2 pixels)
-                if (Math.abs(this.player1.y - expectedY) <= 2) {
-                    this.player1.y = expectedY;
+            // Only check player 1 if they haven't fallen into lava
+            if (!this.player1FellInLava && this.player1 && this.player1.body) {
+                const playerBottom1 = this.player1.y + this.HARDCODED_PLAYER_HALF_HEIGHT;
+                const isOnGround1 = this.player1.body.touching.down && Math.abs(playerBottom1 - groundTop) < 50;
+                
+                // Only correct position if player is actually on the ground AND not falling
+                // This prevents forcing player into ground when falling from high heights
+                if (isOnGround1 && Math.abs(this.player1.body.velocity.y) < 10 && this.player1OrbBoostTimer === 0) {
+                    const expectedY = groundTop - this.HARDCODED_PLAYER_HALF_HEIGHT;
+                    // Only correct if player is very close to expected position (within 2 pixels)
+                    if (Math.abs(this.player1.y - expectedY) <= 2) {
+                        this.player1.y = expectedY;
+                    }
                 }
             }
-            if (isOnGround2 && Math.abs(this.player2.body.velocity.y) < 10 && this.player2OrbBoostTimer === 0) {
-                const expectedY = groundTop - this.HARDCODED_PLAYER_HALF_HEIGHT;
-                // Only correct if player is very close to expected position (within 2 pixels)
-                if (Math.abs(this.player2.y - expectedY) <= 2) {
-                    this.player2.y = expectedY;
+            
+            // Only check player 2 if they haven't fallen into lava
+            if (!this.player2FellInLava && this.player2 && this.player2.body) {
+                const playerBottom2 = this.player2.y + this.HARDCODED_PLAYER_HALF_HEIGHT;
+                const isOnGround2 = this.player2.body.touching.down && Math.abs(playerBottom2 - groundTop) < 50;
+                
+                // Only correct position if player is actually on the ground AND not falling
+                // This prevents forcing player into ground when falling from high heights
+                if (isOnGround2 && Math.abs(this.player2.body.velocity.y) < 10 && this.player2OrbBoostTimer === 0) {
+                    const expectedY = groundTop - this.HARDCODED_PLAYER_HALF_HEIGHT;
+                    // Only correct if player is very close to expected position (within 2 pixels)
+                    if (Math.abs(this.player2.y - expectedY) <= 2) {
+                        this.player2.y = expectedY;
+                    }
                 }
             }
         }
@@ -727,7 +879,7 @@ export class Volcano extends Phaser.Scene {
         const seconds = Math.floor(remaining % 60);
         this.timeText.setText(`${minutes}:${seconds.toString().padStart(2, '0')}`);
         
-        if (!this.orbSequenceStarted && this.levelTime >= this.orbSequenceStartTime) {
+        if (!this.orbSequenceStarted && Math.ceil(remaining) <= (this.levelDuration - this.orbSequenceStartTime)) {
             this.startOrbSequence();
         }
         
@@ -746,36 +898,72 @@ export class Volcano extends Phaser.Scene {
         this.updateLavaOrbs(dt);
         this.updateOrbSequence(dt);
         
-        this.checkClimbing(this.player1);
-        this.checkClimbing(this.player2);
+        // HARDCODED: Only check climbing and update players if they haven't fallen into lava and aren't frozen for message
+        if (!this.player1FellInLava && !this.playersFrozenForLavaMessage) {
+            this.checkClimbing(this.player1);
+        }
+        if (!this.player2FellInLava && !this.playersFrozenForLavaMessage) {
+            this.checkClimbing(this.player2);
+        }
         
-        if (!this.playersFrozen) {
-            this.updatePlayer(this.player1, { up: this.wKey, down: this.sKey, left: this.cursorsWASD.A, right: this.cursorsWASD.D });
-            this.updatePlayer(this.player2, { up: this.upKey, down: this.downKey, left: this.cursorsArrows.left, right: this.cursorsArrows.right });
+        if (!this.playersFrozen && !this.playersFrozenForLavaMessage) {
+            // HARDCODED: Only update players if they haven't fallen into lava and aren't frozen for message
+            if (!this.player1FellInLava) {
+                this.updatePlayer(this.player1, { up: this.wKey, down: this.sKey, left: this.cursorsWASD.A, right: this.cursorsWASD.D });
+            }
+            if (!this.player2FellInLava) {
+                this.updatePlayer(this.player2, { up: this.upKey, down: this.downKey, left: this.cursorsArrows.left, right: this.cursorsArrows.right });
+            }
         } else {
-            if (this.player1 && this.player1.body) {
+            if (this.player1 && this.player1.body && (!this.player1FellInLava || this.playersFrozenForLavaMessage)) {
                 this.player1.body.setVelocity(0, 0);
             }
-            if (this.player2 && this.player2.body) {
+            if (this.player2 && this.player2.body && (!this.player2FellInLava || this.playersFrozenForLavaMessage)) {
                 this.player2.body.setVelocity(0, 0);
             }
         }
         
         this.updateFaultlinePuzzle(dt);
         this.updateInfluence(dt);
+        
+        // CRITICAL: Run freeze logic AGAIN at the very end to override ANY code that moved players
+        const endSpawnX1 = this.player1Spawn.x;
+        const endSpawnX2 = this.player2Spawn.x;
+        const endSpawnY = this.player1Spawn.y;
+
+        if (this.playersFrozenForLavaMessage) {
+            // FORCE position one final time at the end of update to override everything
+            if (this.player1) {
+                this.player1.x = endSpawnX1;
+                this.player1.y = endSpawnY;
+                if (this.player1.body) {
+                    this.player1.body.setEnable(false);
+                    this.player1.body.x = endSpawnX1;
+                    this.player1.body.y = endSpawnY;
+                }
+            }
+            if (this.player2) {
+                this.player2.x = endSpawnX2;
+                this.player2.y = endSpawnY;
+                if (this.player2.body) {
+                    this.player2.body.setEnable(false);
+                    this.player2.body.x = endSpawnX2;
+                    this.player2.body.y = endSpawnY;
+                }
+            }
+        }
     }
 
     createBackground() {
         this.backgroundLayer = this.add.layer();
         this.backgroundLayer.setDepth(-100);
-        const background = this.add.image(0, 0, 'volcano');
+        // Create a black rectangle instead of using volcano.webp
+        const worldWidth = 1280;
+        const worldHeight = 2200; // Match physics world height
+        const background = this.add.rectangle(worldWidth / 2, worldHeight / 2, worldWidth, worldHeight, 0x000000);
         background.setOrigin(0.5, 0.5);
         background.setDepth(-100);
         background.setScrollFactor(0, 0);
-        const texture = this.textures.get('volcano');
-        if (texture) {
-            texture.setFilter(Phaser.Textures.FilterMode.NEAREST);
-        }
         this.backgroundLayer.add(background);
         this.volcanoBackground = background;
         this.resizeBackground();
@@ -784,6 +972,8 @@ export class Volcano extends Phaser.Scene {
 
     resizeBackground() {
         if (!this.volcanoBackground) return;
+        const worldWidth = 1280;
+        const worldHeight = 2200; // Match physics world height
         const width = this.scale.width;
         const height = this.scale.height;
         const zoom = this.cameras.main ? (this.cameras.main.zoom || 1) : 1;
@@ -792,30 +982,100 @@ export class Volcano extends Phaser.Scene {
         const visibleWorldWidth = width / zoom;
         const visibleWorldHeight = height / zoom;
         
-        // Get original dimensions of the image (396x224)
-        const bgWidth = this.volcanoBackground.width;
-        const bgHeight = this.volcanoBackground.height;
-        
-        // Log required debug info
-        console.log(`Camera viewport size: ${width}x${height}`);
-        console.log(`Background bounds before scaling: ${bgWidth}x${bgHeight}`);
-        
-        // Calculate the 'Cover' scale against the VISIBLE WORLD area
-        const scaleX = visibleWorldWidth / bgWidth;
-        const scaleY = visibleWorldHeight / bgHeight;
-        const scale = Math.max(scaleX, scaleY);
-        
-        console.log(`Background scale applied: ${scale}`);
-        
-        // Apply scale
-        this.volcanoBackground.setScale(scale);
+        // Resize the black rectangle to cover the visible area (rectangles have width/height properties)
+        this.volcanoBackground.width = Math.max(visibleWorldWidth, worldWidth);
+        this.volcanoBackground.height = Math.max(visibleWorldHeight, worldHeight);
         
         // Center the background in the world (where the gameplay is)
         this.volcanoBackground.setPosition(this.cameras.main.centerX, this.cameras.main.centerY);
     }
+
+    createInfluenceBar(centerX, centerY, color, faction, flip = false) {
+        const barWidth = 300;
+        const barHeight = 18;
+        const circleRadius = 22;
+        const spacing = 8;
+        const totalWidth = circleRadius * 2 + spacing + barWidth;
+        const leftX = centerX - totalWidth / 2;
+        const rightX = centerX + totalWidth / 2;
+        const circleX = flip ? rightX - circleRadius : leftX + circleRadius;
+        const barX = flip ? rightX - (circleRadius * 2 + spacing) - barWidth : leftX + circleRadius * 2 + spacing;
+        const barY = centerY;
+
+        const shadow = this.add.rectangle(barX + barWidth / 2, barY + 3, barWidth + 8, barHeight + 8, 0x000000, 0.25)
+            .setOrigin(0.5, 0.5)
+            .setDepth(9988)
+            .setScrollFactor(0, 0);
+
+        const glow = this.add.rectangle(barX + barWidth / 2, barY, barWidth + 16, barHeight + 12, color, 0.22)
+            .setOrigin(0.5, 0.5)
+            .setDepth(9990)
+            .setScrollFactor(0, 0);
+
+        const frame = this.add.rectangle(barX + barWidth / 2, barY, barWidth + 8, barHeight + 8, 0x111111, 1)
+            .setOrigin(0.5, 0.5)
+            .setDepth(9990)
+            .setScrollFactor(0, 0);
+        frame.setStrokeStyle(3, color, 1);
+
+        const bg = this.add.rectangle(barX + barWidth / 2, barY, barWidth, barHeight, 0x2a2a2a, 1)
+            .setOrigin(0.5, 0.5)
+            .setDepth(9991)
+            .setScrollFactor(0, 0);
+
+        const fill = this.add.rectangle(flip ? barX + barWidth : barX, barY, 0, barHeight, color, 0.95)
+            .setOrigin(flip ? 1 : 0, 0.5)
+            .setDepth(9993)
+            .setScrollFactor(0, 0);
+
+
+        const circleGlow = this.add.circle(circleX, barY, circleRadius + 4, color, 0.25)
+            .setDepth(9992)
+            .setScrollFactor(0, 0);
+        const circleFrame = this.add.circle(circleX, barY, circleRadius, 0xffffff, 1)
+            .setDepth(9993)
+            .setScrollFactor(0, 0);
+        circleFrame.setStrokeStyle(2, color, 0.9);
+
+        const model = this.add.rectangle(circleX, barY, 26, 26, color, 1)
+            .setDepth(9994)
+            .setScrollFactor(0, 0);
+        const modelMask = this.add.circle(circleX, barY, circleRadius - 2, 0xffffff, 1)
+            .setDepth(9993)
+            .setScrollFactor(0, 0);
+        model.setMask(modelMask.createGeometryMask());
+
+        return {
+            faction,
+            fill,
+            glow,
+            shadow,
+            circleGlow,
+            currentWidth: 0,
+            maxWidth: barWidth,
+            flip,
+            lastValue: 0
+        };
+    }
+
+    applyTopCameraPadding() {
+        const worldWidth = 1280;
+        const worldHeight = 720;
+        const topPad = this.topCameraPadding || 0;
+        const width = this.scale.width;
+        const height = this.scale.height;
+
+        // Increase camera view height to expose extra space above while keeping ground visible
+        this.cameras.main.setSize(width, height + topPad);
+        this.cameras.main.setBounds(0, -topPad, worldWidth, worldHeight + topPad);
+        this.cameras.main.centerOn(worldWidth / 2, (worldHeight / 2) - (topPad / 2));
+    }
     
     updateLavaOrbs(dt) {
         this.lavaOrbs.forEach(orb => {
+            if (orb.romanText) {
+                orb.romanText.setPosition(orb.body.x, orb.body.y + 1);
+            }
             // Handle cooldown state
             if (orb.isOnCooldown) {
                 orb.cooldownTimer += dt;
@@ -824,6 +1084,16 @@ export class Volcano extends Phaser.Scene {
                 orb.body.setFillStyle(0x333333, 0.3);
                 orb.core.setFillStyle(0x222222, 0.2);
                 orb.glow.setFillStyle(0x111111, 0.1);
+                if (orb.romanText) {
+                    orb.romanText.setAlpha(0.35);
+                    orb.romanText.setColor('#665555');
+                }
+                if (orb.embers && orb.embers.length) {
+                    orb.embers.forEach(ember => {
+                        ember.setAlpha(0.15);
+                        ember.setScale(0.7);
+                    });
+                }
                 
                 // Hide charge timer text during cooldown
                 if (orb.chargeTimerText) {
@@ -845,6 +1115,7 @@ export class Volcano extends Phaser.Scene {
                     orb.cooldownTimer = 0;
                     orb.isCharged = false; // Start charging after cooldown
                     orb.chargeTimer = 0;
+                    this.triggerOrbReady(orb);
                     // Remove disabled indicator
                     if (orb.disabledIndicator) {
                         orb.disabledIndicator.destroy();
@@ -877,6 +1148,16 @@ export class Volcano extends Phaser.Scene {
                 orb.glow.setFillStyle(orb.originalColors.glow, glowAlpha);
                 orb.body.setFillStyle(orb.originalColors.body, bodyAlpha);
                 orb.core.setFillStyle(orb.originalColors.core, coreAlpha);
+                if (orb.romanText) {
+                    orb.romanText.setAlpha(0.5 + (chargeProgress * 0.5));
+                    orb.romanText.setColor('#FFE9B0');
+                }
+                if (orb.embers && orb.embers.length) {
+                    orb.embers.forEach(ember => {
+                        ember.setAlpha(0.2 + (chargeProgress * 0.5));
+                        ember.setScale(0.8 + (chargeProgress * 0.3));
+                    });
+                }
                 
                 // Scale up slightly as it charges
                 const scale = 0.8 + (chargeProgress * 0.2);
@@ -918,19 +1199,23 @@ export class Volcano extends Phaser.Scene {
                     orb.core.setFillStyle(0xFFFFFF, 1.0); // White hot when ready
                     
                     // Quick pulse to indicate ready
-                    this.tweens.add({
-                        targets: [orb.core],
-                        scale: { from: 1.0, to: 1.3 },
-                        duration: 200,
-                        yoyo: true,
-                        ease: 'Power2'
-                    });
+                    this.triggerOrbReady(orb);
                 }
             } else {
                 // Fully charged - bright and pulsing
                 orb.glow.setFillStyle(orb.originalColors.glow, 0.5);
                 orb.body.setFillStyle(orb.originalColors.body, 1.0);
                 orb.core.setFillStyle(orb.originalColors.core, 1.0);
+                if (orb.romanText) {
+                    orb.romanText.setAlpha(1.0);
+                    orb.romanText.setColor('#FFE9B0');
+                }
+                if (orb.embers && orb.embers.length) {
+                    orb.embers.forEach(ember => {
+                        ember.setAlpha(0.6);
+                        ember.setScale(1.0);
+                    });
+                }
                 
                 // Hide charge timer text when charged
                 if (orb.chargeTimerText) {
@@ -966,6 +1251,7 @@ export class Volcano extends Phaser.Scene {
                             orb.isCharged = false;
                             orb.isOnCooldown = true;
                             orb.cooldownTimer = 0;
+                            this.triggerOrbActivation(orb);
                             
                             // Visual feedback
                             orb.core.setFillStyle(0xFFFFFF, 1.0);
@@ -1015,6 +1301,81 @@ export class Volcano extends Phaser.Scene {
             }
         });
     }
+
+    showLavaStatusMessage(text) {
+        if (this.lavaStatusTimer) {
+            this.lavaStatusTimer.remove();
+            this.lavaStatusTimer = null;
+        }
+        if (this.lavaStatusText) {
+            this.lavaStatusText.destroy();
+        }
+        this.lavaStatusText = this.add.text(640, 240, text, {
+            fontSize: '32px',
+            fill: '#FFFFFF',
+            fontStyle: 'bold',
+            stroke: '#000000',
+            strokeThickness: 5,
+            resolution: 2
+        }).setOrigin(0.5, 0.5).setDepth(10000);
+
+        this.lavaStatusTimer = this.time.delayedCall(1500, () => {
+            if (this.lavaStatusText) {
+                this.lavaStatusText.destroy();
+                this.lavaStatusText = null;
+            }
+            this.lavaStatusTimer = null;
+        });
+    }
+
+    triggerOrbActivation(orb) {
+        if (!orb) return;
+        if (orb.romanText) {
+            orb.romanText.setColor('#FFFFFF');
+            orb.romanText.setAlpha(1.0);
+        }
+        if (orb.embers && orb.embers.length) {
+            orb.embers.forEach(ember => {
+                ember.setAlpha(0.9);
+                ember.setScale(1.25);
+            });
+        }
+
+        this.tweens.add({
+            targets: [orb.body, orb.core],
+            scale: { from: 1.0, to: 0.85 },
+            duration: 120,
+            yoyo: true,
+            ease: 'Sine.easeInOut'
+        });
+        this.tweens.add({
+            targets: [orb.glow],
+            scale: { from: 1.0, to: 1.6 },
+            alpha: { from: 0.6, to: 0 },
+            duration: 350,
+            ease: 'Cubic.easeOut'
+        });
+    }
+
+    triggerOrbReady(orb) {
+        if (!orb) return;
+        this.tweens.add({
+            targets: [orb.core, orb.body],
+            scale: { from: 1.0, to: 1.2 },
+            duration: 180,
+            yoyo: true,
+            ease: 'Sine.easeInOut'
+        });
+        if (orb.romanText) {
+            this.tweens.add({
+                targets: orb.romanText,
+                alpha: { from: 0.7, to: 1.0 },
+                duration: 220,
+                yoyo: true,
+                ease: 'Sine.easeInOut'
+            });
+        }
+    }
     
     updateFallingPlatforms(dt) {
         this.fallingPlatforms.forEach(platform => {
@@ -1024,10 +1385,31 @@ export class Volcano extends Phaser.Scene {
                     platform.fallVelocity += this.gravity * dt;
                     platform.y += platform.fallVelocity * dt;
                 }
+                platform.angle += dt * 120;
                 
                 if (platform.y > 1200) {
                     platform.setVisible(false);
                     // Static bodies don't have setEnable, just hide it
+                    if (!platform.respawnTimer) {
+                        platform.respawnTimer = this.time.delayedCall(5000, () => {
+                            platform.isFalling = false;
+                            platform.fallTimer = 0;
+                            platform.fallActivated = false;
+                            platform.breakTriggered = false;
+                            platform.fallVelocity = 0;
+                            platform.angle = 0;
+                            platform.clearTint();
+                            platform.setVisible(true);
+                            platform.x = platform.originalX;
+                            platform.y = platform.originalY;
+                            if (platform.colliders && platform.colliders.length === 0) {
+                                const collider1 = this.physics.add.collider(this.player1, platform);
+                                const collider2 = this.physics.add.collider(this.player2, platform);
+                                platform.colliders.push(collider1, collider2);
+                            }
+                            platform.respawnTimer = null;
+                        });
+                    }
                 }
                 return;
             }
@@ -1044,24 +1426,43 @@ export class Volcano extends Phaser.Scene {
             else platform.playersOnPlatform.delete(this.player1);
             if (p2On) platform.playersOnPlatform.add(this.player2);
             else platform.playersOnPlatform.delete(this.player2);
+
+            if ((p1On || p2On) && !platform.fallActivated) {
+                platform.fallActivated = true;
+            }
             
-            if (platform.playersOnPlatform.size > 0 && !platform.isFalling) {
+            if (platform.fallActivated && !platform.isFalling) {
                 platform.fallTimer += dt;
-                
-                // Intense Shake Effect (Level 5 Danger)
-                platform.x = platform.originalX + (Math.random() - 0.5) * 4;
-                platform.y = platform.originalY + (Math.random() - 0.5) * 4;
-                
+                const wobble = platform.fallTimer > 0.5 ? 4 : 2;
+                platform.x = platform.originalX;
+                platform.y = platform.originalY;
+                platform.angle = Math.sin(this.levelTime * 40) * wobble;
+
+                if (platform.fallTimer > 0.1 && !platform.crackLight) {
+                    platform.crackLight = this.createPlatformCracks(platform, 0.6, 4);
+                }
+
                 if (platform.fallTimer > 0.5) {
                     platform.setTint(0xFF0000); // Warning tint
-                    // Faster shake
-                    platform.x = platform.originalX + (Math.random() - 0.5) * 8;
-                    platform.y = platform.originalY + (Math.random() - 0.5) * 8;
+                    if (!platform.crackHeavy) {
+                        platform.crackHeavy = this.createPlatformCracks(platform, 0.9, 7);
+                    }
                 }
                 
                 if (platform.fallTimer >= 1.0 && !platform.isFalling) {
                     // Mark as falling immediately to prevent multiple triggers
                     platform.isFalling = true;
+                    platform.breakTriggered = true;
+                    this.spawnPlatformDebris(platform);
+                    this.cameras.main.shake(120, 0.003);
+                    if (platform.crackLight) {
+                        platform.crackLight.destroy();
+                        platform.crackLight = null;
+                    }
+                    if (platform.crackHeavy) {
+                        platform.crackHeavy.destroy();
+                        platform.crackHeavy = null;
+                    }
                     
                     // CRITICAL: Remove all colliders BEFORE making platform dynamic
                     // This prevents the game from freezing
@@ -1087,13 +1488,142 @@ export class Volcano extends Phaser.Scene {
                     platform.fallVelocity = 0;
                     platform.setTint(0x8B0000); // Falling tint
                 }
-            } else if (platform.playersOnPlatform.size === 0 && platform.fallTimer > 0) {
+            } else if (!platform.fallActivated) {
                 platform.fallTimer = 0;
                 platform.clearTint();
-                // Reset position after shaking
                 platform.x = platform.originalX;
                 platform.y = platform.originalY;
+                platform.angle = 0;
+                if (platform.crackLight) {
+                    platform.crackLight.destroy();
+                    platform.crackLight = null;
+                }
+                if (platform.crackHeavy) {
+                    platform.crackHeavy.destroy();
+                    platform.crackHeavy = null;
+                }
             }
+        });
+    }
+
+    createPlatformCracks(platform, alpha, lineWidth) {
+        const g = this.add.graphics();
+        g.setDepth(platform.depth + 1);
+        g.setAlpha(alpha);
+        g.lineStyle(lineWidth, 0xffd7a3, 1);
+        const left = platform.x - platform.width / 2 + 6;
+        const right = platform.x + platform.width / 2 - 6;
+        const y = platform.y;
+        const segments = 7 + Math.floor(Math.random() * 4);
+        const strands = 2;
+        for (let s = 0; s < strands; s++) {
+            let x = left + Math.random() * 8;
+            g.beginPath();
+            g.moveTo(x, y + (Math.random() - 0.5) * 6);
+            for (let i = 0; i < segments; i++) {
+                x += (right - left) / segments;
+                g.lineTo(x, y + (Math.random() - 0.5) * 10);
+            }
+            g.strokePath();
+        }
+        return g;
+    }
+
+    spawnPlatformDebris(platform) {
+        const count = 40;
+        const textureKey = this.textures.exists('falling-magma-platform')
+            ? 'falling-magma-platform'
+            : (platform.texture && platform.texture.key ? platform.texture.key : 'magma-platform');
+        const groundY = this.HARDCODED_GROUND_TOP - 6;
+        const texture = this.textures.get(textureKey);
+        const texSize = texture && texture.getSourceImage() ? texture.getSourceImage().width : 32;
+        for (let i = 0; i < count; i++) {
+            const size = Phaser.Math.Between(12, 24);
+            const groundStopY = groundY - (size / 2);
+            const startX = platform.x + Phaser.Math.Between(-platform.width / 2, platform.width / 2);
+            const startY = platform.y + Phaser.Math.Between(-platform.height / 2, platform.height / 2);
+            const cropSize = Phaser.Math.Between(Math.floor(texSize * 0.35), Math.floor(texSize * 0.6));
+            const cropRange = Math.floor(texSize * 0.15);
+            const cropX = Phaser.Math.Clamp(Math.floor((texSize / 2) - (cropSize / 2) + Phaser.Math.Between(-cropRange, cropRange)), 0, texSize - cropSize);
+            const cropY = Phaser.Math.Clamp(Math.floor((texSize / 2) - (cropSize / 2) + Phaser.Math.Between(-cropRange, cropRange)), 0, texSize - cropSize);
+            const tile = this.add.image(startX, startY, textureKey).setDepth(10005).setAlpha(1);
+            tile.setCrop(cropX, cropY, cropSize, cropSize);
+            tile.setDisplaySize(size, size);
+            const chunk = tile;
+            this.debrisPieces.push(chunk);
+
+            const dx = Phaser.Math.Between(-420, 420);
+            const burstX = chunk.x + dx * 0.6;
+            const burstY = chunk.y + Phaser.Math.Between(-120, 40);
+            const landX = burstX + Phaser.Math.Between(-140, 140);
+            const landY = Phaser.Math.Clamp(
+                chunk.y + Phaser.Math.Between(160, 340),
+                groundStopY - 6,
+                groundStopY
+            );
+
+            this.tweens.add({
+                targets: chunk,
+                x: burstX,
+                y: burstY,
+                angle: Phaser.Math.Between(-160, 160),
+                duration: 160,
+                ease: 'Quad.easeOut',
+                onComplete: () => {
+                    this.tweens.add({
+                        targets: chunk,
+                        x: landX,
+                        y: landY,
+                        angle: Phaser.Math.Between(-220, 220),
+                        duration: 750,
+                        ease: 'Bounce.easeOut',
+                        onComplete: () => {
+                            this.tweens.add({
+                                targets: chunk,
+                                alpha: 0,
+                                duration: 600,
+                                ease: 'Quad.easeOut',
+                                onComplete: () => {
+                                    this.removeDebrisPiece(chunk);
+                                    chunk.destroy();
+                                }
+                            });
+                        }
+                    });
+                }
+            });
+        }
+
+        const dust = this.add.circle(platform.x, platform.y + 6, platform.width * 0.65, 0x8a5a44, 0.5)
+            .setDepth(platform.depth + 1);
+        this.tweens.add({
+            targets: dust,
+            scale: 1.6,
+            alpha: 0,
+            duration: 520,
+            ease: 'Quad.easeOut',
+            onComplete: () => dust.destroy()
+        });
+    }
+
+    removeDebrisPiece(piece) {
+        if (!this.debrisPieces || !this.debrisPieces.length || !piece) return;
+        this.debrisPieces = this.debrisPieces.filter(item => item && item !== piece);
+    }
+
+    cullDebrisByLava() {
+        if (!this.lava || !this.lava.visible || !this.debrisPieces || !this.debrisPieces.length) {
+            return;
+        }
+        const lavaTopY = this.lava.y - this.lava.height;
+        this.debrisPieces = this.debrisPieces.filter(piece => {
+            if (!piece || !piece.active) return false;
+            const pieceBottom = piece.y + (piece.displayHeight / 2);
+            if (pieceBottom >= lavaTopY) {
+                piece.destroy();
+                return false;
+            }
+            return true;
         });
     }
     
@@ -1361,53 +1891,55 @@ export class Volcano extends Phaser.Scene {
     }
     
     updateRisingLava(dt) {
-        // HARDCODED: Determine which lava event we're in (1st or 2nd)
+        // Determine which lava event should run based on remaining time
         let currentWarningStart = 0;
         let currentLavaStart = 0;
-        
-        // Check for first event
-        if (this.levelTime >= this.lavaRiseStartTime1 && this.levelTime < this.lavaRiseActualStart1) {
-            // First event warning period
-            if (this.lavaEventNumber === 0) {
-                this.lavaEventNumber = 1;
+        const remaining = this.levelDuration - this.levelTime;
+        const event1WarningRemaining = this.levelDuration - this.lavaRiseStartTime1; // 4:40
+        const event1StartRemaining = this.levelDuration - this.lavaRiseActualStart1; // 4:30
+        const event2WarningRemaining = this.levelDuration - this.lavaRiseStartTime2; // 1:40
+        const event2StartRemaining = this.levelDuration - this.lavaRiseActualStart2; // 1:30
+
+        if (!this.lavaEvent1Triggered) {
+            if (!this.lavaEvent1WarningShown && remaining <= event1WarningRemaining && remaining > event1StartRemaining) {
+                this.lavaEvent1WarningShown = true;
             }
-            currentWarningStart = this.lavaRiseStartTime1;
-            currentLavaStart = this.lavaRiseActualStart1;
-        } else if (this.levelTime >= this.lavaRiseActualStart1 && this.levelTime < this.lavaRiseStartTime2) {
-            // First event lava rising period
-            if (this.lavaEventNumber === 0) {
+            if (remaining <= event1StartRemaining) {
+                this.lavaEvent1Triggered = true;
                 this.lavaEventNumber = 1;
-            }
-            currentLavaStart = this.lavaRiseActualStart1;
-        } else if (this.levelTime >= this.lavaRiseStartTime2 && this.levelTime < this.lavaRiseActualStart2) {
-            // Second event warning period (reset flags if first event ended)
-            if (this.lavaSurvivalChecked && this.lavaEventNumber <= 1) {
-                // Reset flags for second event
                 this.lavaSurvivalChecked = false;
                 this.lavaRising = false;
                 this.lavaRiseTimer = 0;
-                this.lavaEventNumber = 2;
-                this.player1LavaDebuff = false;
-                this.player2LavaDebuff = false;
             }
-            if (this.lavaEventNumber === 2) {
+            if (this.lavaEvent1WarningShown) {
+                currentWarningStart = this.lavaRiseStartTime1;
+                currentLavaStart = this.lavaRiseActualStart1;
+            }
+        }
+
+        if (this.lavaEvent1Triggered && this.lavaEventNumber === 1 && !this.lavaSurvivalChecked) {
+            currentLavaStart = this.lavaRiseActualStart1;
+        }
+
+        if (this.lavaEvent1Triggered && this.lavaSurvivalChecked && !this.lavaEvent2Triggered) {
+            if (!this.lavaEvent2WarningShown && remaining <= event2WarningRemaining && remaining > event2StartRemaining) {
+                this.lavaEvent2WarningShown = true;
+            }
+            if (remaining <= event2StartRemaining) {
+                this.lavaEvent2Triggered = true;
+                this.lavaEventNumber = 2;
+                this.lavaSurvivalChecked = false;
+                this.lavaRising = false;
+                this.lavaRiseTimer = 0;
+            }
+            if (this.lavaEvent2WarningShown) {
                 currentWarningStart = this.lavaRiseStartTime2;
                 currentLavaStart = this.lavaRiseActualStart2;
             }
-        } else if (this.levelTime >= this.lavaRiseActualStart2) {
-            // Second event lava rising period
-            if (this.lavaSurvivalChecked && this.lavaEventNumber <= 1) {
-                // Reset flags for second event
-                this.lavaSurvivalChecked = false;
-                this.lavaRising = false;
-                this.lavaRiseTimer = 0;
-                this.lavaEventNumber = 2;
-                this.player1LavaDebuff = false;
-                this.player2LavaDebuff = false;
-            }
-            if (this.lavaEventNumber === 2) {
-                currentLavaStart = this.lavaRiseActualStart2;
-            }
+        }
+
+        if (this.lavaEvent2Triggered && this.lavaEventNumber === 2 && !this.lavaSurvivalChecked) {
+            currentLavaStart = this.lavaRiseActualStart2;
         }
         
         // HARDCODED: If lava was removed and we're not in a new event, don't update it
@@ -1438,6 +1970,18 @@ export class Volcano extends Phaser.Scene {
             if (this.lavaGlow) {
                 this.lavaGlow.setVisible(false);
             }
+            if (this.lavaEdgeGlow) {
+                this.lavaEdgeGlow.setVisible(false);
+            }
+            if (this.lavaSurfaceSegments) {
+                this.lavaSurfaceSegments.forEach(segment => segment.rect.setVisible(false));
+            }
+            if (this.lavaSurfaceCrust) {
+                this.lavaSurfaceCrust.forEach(crust => crust.setVisible(false));
+            }
+            if (this.lavaSurfaceHighlights) {
+                this.lavaSurfaceHighlights.forEach(highlight => highlight.setVisible(false));
+            }
             if (this.lavaParticles && this.lavaParticles.length > 0) {
                 this.lavaParticles.forEach(p => {
                     if (p) p.setVisible(false);
@@ -1449,13 +1993,13 @@ export class Volcano extends Phaser.Scene {
                 if (this.lava) {
                     this.lava.setVisible(true);
                     this.lava.setAlpha(1.0);
-                    this.lava.setDepth(999);
+                    this.lava.setDepth(10001); // HARDCODED: Higher than indicators (10000) to cover them
                 } else {
                     // HARDCODED: Create lava if it doesn't exist (fallback)
                     const lavaStartY = this.HARDCODED_GROUND_TOP;
-                    this.lava = this.add.rectangle(640, lavaStartY, 2000, 0, 0xFF4500);
+                    this.lava = this.add.rectangle(640, lavaStartY, 3500, 0, 0xFF4500);
                     this.lava.setOrigin(0.5, 1.0); // Origin at bottom
-                    this.lava.setDepth(999);
+                    this.lava.setDepth(10001); // HARDCODED: Higher than indicators (10000) to cover them
                     this.lava.setAlpha(1.0);
                     this.lava.setVisible(true);
                     console.log('HARDCODED: Created missing lava in update!');
@@ -1463,21 +2007,45 @@ export class Volcano extends Phaser.Scene {
                 if (this.lavaGlow) {
                     this.lavaGlow.setVisible(true);
                     this.lavaGlow.setAlpha(1.0);
-                    this.lavaGlow.setDepth(1000);
+                    this.lavaGlow.setDepth(10002); // HARDCODED: Higher than lava to show glow
+                }
+                if (this.lavaEdgeGlow) {
+                    this.lavaEdgeGlow.setVisible(true);
+                    this.lavaEdgeGlow.setAlpha(0.75);
+                    this.lavaEdgeGlow.setDepth(10002.5);
                 }
                 if (this.lavaParticles && this.lavaParticles.length > 0) {
                     this.lavaParticles.forEach(p => {
                         if (p) {
                             p.setVisible(true);
                             p.setAlpha(1.0);
-                            p.setDepth(1001);
+                            p.setDepth(10003); // HARDCODED: Highest for particles
                         }
                     });
+                }
+                if (this.lavaSurfaceSegments) {
+                    this.lavaSurfaceSegments.forEach(segment => segment.rect.setVisible(true));
+                }
+                if (this.lavaSurfaceCrust) {
+                    this.lavaSurfaceCrust.forEach(crust => crust.setVisible(true));
+                }
+                if (this.lavaSurfaceHighlights) {
+                    this.lavaSurfaceHighlights.forEach(highlight => highlight.setVisible(true));
                 }
             } else {
                 // Event ended: keep everything hidden
                 if (this.lava) this.lava.setVisible(false);
                 if (this.lavaGlow) this.lavaGlow.setVisible(false);
+                if (this.lavaEdgeGlow) this.lavaEdgeGlow.setVisible(false);
+                if (this.lavaSurfaceSegments) {
+                    this.lavaSurfaceSegments.forEach(segment => segment.rect.setVisible(false));
+                }
+                if (this.lavaSurfaceCrust) {
+                    this.lavaSurfaceCrust.forEach(crust => crust.setVisible(false));
+                }
+                if (this.lavaSurfaceHighlights) {
+                    this.lavaSurfaceHighlights.forEach(highlight => highlight.setVisible(false));
+                }
                 if (this.lavaParticles && this.lavaParticles.length > 0) {
                     this.lavaParticles.forEach(p => { if (p) p.setVisible(false); });
                 }
@@ -1494,7 +2062,7 @@ export class Volcano extends Phaser.Scene {
             // Show countdown: 10, 9, 8, ... 1
             const timeUntilRise = currentLavaStart - this.levelTime;
             const countdown = Math.floor(timeUntilRise);
-            this.lavaWarningText.setText(`LAVA RISING IN: ${countdown}`);
+            this.lavaWarningText.setText(`LAVA RISING COUNTDOWN: ${countdown}`);
             
             // Pulse effect
             this.lavaWarningText.setScale(1.0 + Math.sin(this.levelTime * 10) * 0.1);
@@ -1515,7 +2083,7 @@ export class Volcano extends Phaser.Scene {
                 if (this.lava) {
                     this.lava.setVisible(true);
                     this.lava.setAlpha(1.0);
-                    this.lava.setDepth(10);
+                    this.lava.setDepth(10001); // HARDCODED: Higher than indicators (10000) to cover them
                     console.log('LAVA OBJECT - Y:', this.lava.y, 'Visible:', this.lava.visible, 'Alpha:', this.lava.alpha, 'Depth:', this.lava.depth);
                 } else {
                     console.error('LAVA OBJECT IS NULL!');
@@ -1523,14 +2091,14 @@ export class Volcano extends Phaser.Scene {
                 if (this.lavaGlow) {
                     this.lavaGlow.setVisible(true);
                     this.lavaGlow.setAlpha(0.8);
-                    this.lavaGlow.setDepth(11);
+                    this.lavaGlow.setDepth(10002); // HARDCODED: Higher than lava to show glow
                 }
                 if (this.lavaParticles && this.lavaParticles.length > 0) {
                     this.lavaParticles.forEach((p, i) => {
                         if (p) {
                             p.setVisible(true);
                             p.setAlpha(1.0);
-                            p.setDepth(12);
+                            p.setDepth(10003); // HARDCODED: Highest for particles
                         }
                     });
                 }
@@ -1568,22 +2136,24 @@ export class Volcano extends Phaser.Scene {
                 this.lava.y = this.lavaStartY; // Bottom always at ground level - NEVER MOVES
                 this.lava.setVisible(true);
                 this.lava.setAlpha(1.0);
-                this.lava.setDepth(999);
+                this.lava.setDepth(10001); // HARDCODED: Higher than indicators (10000) to cover them
                 // HARDCODED: Force update the display
-                this.lava.setSize(2000, currentLavaHeight);
+                this.lava.setSize(3500, currentLavaHeight);
             } else {
                 console.error('LAVA OBJECT MISSING DURING RISE!');
                 // HARDCODED: Try to recreate lava if it's missing
                 if (!this.lava) {
                     const lavaStartY = this.HARDCODED_GROUND_TOP;
-                    this.lava = this.add.rectangle(640, lavaStartY, 2000, 0, 0xFF4500);
+                    this.lava = this.add.rectangle(640, lavaStartY, 3500, 0, 0xFF4500);
                     this.lava.setOrigin(0.5, 1.0); // Origin at bottom center
-                    this.lava.setDepth(999);
+                    this.lava.setDepth(10001); // HARDCODED: Higher than indicators (10000) to cover them
                     this.lava.setAlpha(1.0);
                     this.lava.setVisible(true);
                     console.log('HARDCODED: Recreated missing lava!');
                 }
             }
+
+            this.cullDebrisByLava();
             
             // HARDCODED: Calculate lava top surface position
             const lavaTopY = this.lavaStartY - currentLavaHeight; // Top surface of lava
@@ -1593,19 +2163,64 @@ export class Volcano extends Phaser.Scene {
                 this.lavaGlow.y = lavaTopY; // At the surface of the lava
                 this.lavaGlow.setVisible(true);
                 this.lavaGlow.setAlpha(0.8);
-                this.lavaGlow.setDepth(1000);
+                this.lavaGlow.setDepth(10002); // HARDCODED: Higher than lava to show glow
+            }
+            if (this.lavaEdgeGlow) {
+                this.lavaEdgeGlow.y = lavaTopY;
+                this.lavaEdgeGlow.setVisible(true);
+                this.lavaEdgeGlow.setAlpha(0.8);
+            }
+            if (this.lavaSurfaceSegments && this.lavaSurfaceSegments.length > 0) {
+                const surfaceTime = this.levelTime;
+                this.lavaSurfaceSegments.forEach((segment, index) => {
+                    const wave = Math.sin(surfaceTime * 0.9 + segment.phase + (index * 0.15))
+                        + (Math.sin(surfaceTime * 1.6 + segment.phase * 0.6) * 0.35);
+                    const height = Math.max(4, segment.baseHeight + (segment.amp * wave));
+                    segment.rect.height = height;
+                    segment.rect.y = lavaTopY + segment.offset;
+                    segment.rect.setVisible(true);
+                    if (this.lavaSurfaceCrust && this.lavaSurfaceCrust[index]) {
+                        const crust = this.lavaSurfaceCrust[index];
+                        crust.y = lavaTopY + 1 + segment.offset;
+                        crust.setVisible(true);
+                    }
+                    if (this.lavaSurfaceHighlights && this.lavaSurfaceHighlights[index]) {
+                        const highlight = this.lavaSurfaceHighlights[index];
+                        highlight.y = lavaTopY - height + 2 + segment.offset;
+                        highlight.setVisible(true);
+                    }
+                });
             }
             
             // HARDCODED: Update lava particles - positioned at the TOP SURFACE of lava
             if (this.lavaParticles && this.lavaParticles.length > 0) {
+                const spawnLeft = 640 - (3500 / 2) + 60;
+                const spawnRight = 640 + (3500 / 2) - 60;
                 this.lavaParticles.forEach((particle, index) => {
-                    if (particle && particle.active !== false) {
-                        // Particles float at the surface of the lava
-                        particle.y = lavaTopY + Math.sin(this.levelTime * 2 + index) * 10;
-                        particle.x = 100 + (index * 80) + Math.cos(this.levelTime * 3 + index) * 5;
+                    const data = this.lavaParticleData ? this.lavaParticleData[index] : null;
+                    if (!particle || !data) return;
+                    if (data.life <= 0) {
+                        data.life = Phaser.Math.FloatBetween(0.8, 1.6);
+                        data.maxLife = data.life;
+                        data.vy = Phaser.Math.FloatBetween(18, 40);
+                        data.vx = Phaser.Math.FloatBetween(-8, 8);
+                        data.isLarge = Math.random() < 0.12;
+                        data.baseRadius = data.isLarge ? Phaser.Math.Between(10, 14) : Phaser.Math.Between(4, 8);
+                        particle.x = Phaser.Math.Between(spawnLeft, spawnRight);
+                        particle.y = lavaTopY - Phaser.Math.Between(0, 6) - (data.isLarge ? Phaser.Math.Between(6, 14) : 0);
+                        particle.setFillStyle(data.isLarge ? 0xFFC857 : 0xFF9B2F, 1.0);
                         particle.setVisible(true);
-                        particle.setAlpha(1.0);
-                        particle.setDepth(1001);
+                    }
+                    data.life -= dt;
+                    particle.y -= data.vy * dt;
+                    particle.x += data.vx * dt;
+                    const lifeRatio = Math.max(0, data.life / data.maxLife);
+                    const radius = data.baseRadius * (0.75 + (0.35 * lifeRatio));
+                    particle.setRadius(radius);
+                    particle.setAlpha(lifeRatio);
+                    if (particle.y < lavaTopY - 40 || data.life <= 0) {
+                        data.life = 0;
+                        particle.setVisible(false);
                     }
                 });
             }
@@ -1618,6 +2233,11 @@ export class Volcano extends Phaser.Scene {
                 this.lavaRising = false;
                 // Check if both players survived
                 this.checkLavaCollisions();
+                // End minigame on timer completion if not already ended
+                if (!this.lavaSurvivalChecked) {
+                    this.lavaSurvivalChecked = true;
+                    this.endLavaMinigame();
+                }
             }
         }
     }
@@ -1631,42 +2251,106 @@ export class Volcano extends Phaser.Scene {
         const player1Bottom = this.player1.y + this.HARDCODED_PLAYER_HALF_HEIGHT;
         const player2Bottom = this.player2.y + this.HARDCODED_PLAYER_HALF_HEIGHT;
         
+        // Track if a new player just fell (for message display)
+        let player1JustFell = false;
+        let player2JustFell = false;
+        
         // Check if player 1 falls into lava
-        if (player1Bottom >= lavaTopY && !this.player1LavaDebuff) {
+        if (player1Bottom >= lavaTopY && !this.player1FellInLava) {
+            this.player1FellInLava = true;
             this.player1LavaDebuff = true;
-            console.log('Player 1 touched lava');
-            this.showLavaMessage('Player fell into lava', () => {});
-            this.removeLava();
+            this.player1Respawned = false;
+            player1JustFell = true;
+            // Hide player 1
+            if (this.player1) {
+                this.player1.setVisible(false);
+                this.player1.body.setEnable(false);
+            }
+            console.log('Player 1 (Solari) fell into lava');
         }
         
         // Check if player 2 falls into lava
-        if (player2Bottom >= lavaTopY && !this.player2LavaDebuff) {
+        if (player2Bottom >= lavaTopY && !this.player2FellInLava) {
+            this.player2FellInLava = true;
             this.player2LavaDebuff = true;
-            console.log('Player 2 touched lava');
-            this.showLavaMessage('Player fell into lava', () => {});
-            this.removeLava();
+            this.player2Respawned = false;
+            player2JustFell = true;
+            // Hide player 2
+            if (this.player2) {
+                this.player2.setVisible(false);
+                this.player2.body.setEnable(false);
+            }
+            console.log('Player 2 (Umbrae) fell into lava');
         }
         
-        if (!this.lavaSurvivalChecked && this.lavaRising) {
-            const topPlatformY = 150;
-            const topPlatformTop = topPlatformY - 15; // Platform height is 30, so top is at y-15
-            if (lavaTopY <= topPlatformTop + 20) {
-                const player1Top = this.player1.y - this.HARDCODED_PLAYER_HALF_HEIGHT;
-                const player2Top = this.player2.y - this.HARDCODED_PLAYER_HALF_HEIGHT;
-                if (player1Top < topPlatformTop && player2Top < topPlatformTop && 
-                    !this.player1LavaDebuff && !this.player2LavaDebuff) {
-                    this.lavaSurvivalChecked = true;
-                    this.removeLava();
-                    this.showLavaMessage('Both sides survived the lava!', () => {
-                        this.influenceReward = { rate: 3 };
-                    });
-                }
+        // HARDCODED: Show appropriate message based on who fell
+        if (player1JustFell && player2JustFell) {
+            // Both players fell at the same time
+            this.playerAlive[1] = false;
+            this.playerAlive[2] = false;
+        } else if (player1JustFell) {
+            // Player 1 just fell - update state, continue minigame
+            this.playerAlive[1] = false;
+            if (!this.player2FellInLava) {
+                this.showLavaStatusMessage('Solari fell into the lava!');
+            }
+        } else if (player2JustFell) {
+            // Player 2 just fell - update state, continue minigame
+            this.playerAlive[2] = false;
+            if (!this.player1FellInLava) {
+                this.showLavaStatusMessage('Umbrae fell into the lava!');
             }
         }
+
+        if (this.player1FellInLava && this.player2FellInLava && !this.lavaSurvivalChecked) {
+            this.lavaSurvivalChecked = true;
+            this.endLavaMinigame();
+        }
+        
+        // No early-end checks here; minigame ends only when both fell or timer completes.
+    }
+    
+    endLavaMinigame() {
+        // Compute outcome based on playerAlive state
+        const p1Alive = this.playerAlive[1];
+        const p2Alive = this.playerAlive[2];
+        let outcomeText = '';
+        let onComplete = null;
+        
+        if (!p1Alive && !p2Alive) {
+            outcomeText = 'Both players fell into the lava!';
+        } else if (p1Alive && p2Alive) {
+            outcomeText = 'Both players survived!';
+            onComplete = () => {
+                this.player1InfluenceRate += 2;
+                this.player2InfluenceRate += 2;
+            };
+        } else {
+            // One player survived
+            outcomeText = 'One player survived!';
+            onComplete = () => {
+                if (p1Alive) {
+                    this.player1InfluenceRate += 2;
+                    this.player2InfluenceRate -= 2;
+                } else {
+                    this.player2InfluenceRate += 2;
+                    this.player1InfluenceRate -= 2;
+                }
+            };
+        }
+        
+        this.removeLava();
+        this.showLavaMessage(outcomeText, onComplete);
     }
     
     showLavaMessage(text, onComplete = null) {
         // HARDCODED: Show message in center of screen
+        // Clear any existing message timer to prevent premature destruction
+        if (this.lavaMessageTimer) {
+            this.lavaMessageTimer.remove();
+            this.lavaMessageTimer = null;
+        }
+        
         if (this.lavaMessageText) {
             this.lavaMessageText.destroy();
         }
@@ -1679,12 +2363,62 @@ export class Volcano extends Phaser.Scene {
             resolution: 2
         }).setOrigin(0.5, 0.5).setDepth(10000);
         
-        // Remove message after 3 seconds
-        this.time.delayedCall(3000, () => {
+        // HARDCODED: Freeze players while message is visible
+        this.playersFrozenForLavaMessage = true;
+        if (this.player1 && this.player1.body) {
+            this.player1.body.setVelocity(0, 0);
+        }
+        if (this.player2 && this.player2.body) {
+            this.player2.body.setVelocity(0, 0);
+        }
+        
+        // HARDCODED: Remove message after 2 seconds (2000ms)
+        this.lavaMessageTimer = this.time.delayedCall(2000, () => {
             if (this.lavaMessageText) {
                 this.lavaMessageText.destroy();
                 this.lavaMessageText = null;
             }
+            this.lavaMessageTimer = null;
+            
+            // CRITICAL: Completely reset physics state and force spawn position
+            const spawnX1 = this.player1Spawn.x;
+            const spawnX2 = this.player2Spawn.x;
+            const spawnY = this.player1Spawn.y;
+            
+            console.log('=== MESSAGE DISAPPEARING - RE-ENABLING BODIES ===');
+            console.log('Before re-enable - Player1:', this.player1 ? `x=${this.player1.x}, y=${this.player1.y}` : 'null');
+            console.log('Before re-enable - Player2:', this.player2 ? `x=${this.player2.x}, y=${this.player2.y}` : 'null');
+            
+            if (this.player1) {
+                this.player1.x = spawnX1;
+                this.player1.y = spawnY;
+                if (this.player1.body) {
+                    this.player1.body.setEnable(true);
+                    this.player1.body.x = spawnX1;
+                    this.player1.body.y = spawnY;
+                    this.player1.body.setGravityY(this.gravity);
+                    this.player1.body.setVelocity(0, 0);
+                }
+                console.log('After message - Player1:', `x=${this.player1.x}, y=${this.player1.y}`);
+            }
+            
+            if (this.player2) {
+                this.player2.x = spawnX2;
+                this.player2.y = spawnY;
+                if (this.player2.body) {
+                    this.player2.body.setEnable(true);
+                    this.player2.body.x = spawnX2;
+                    this.player2.body.y = spawnY;
+                    this.player2.body.setGravityY(this.gravity);
+                    this.player2.body.setVelocity(0, 0);
+                }
+                console.log('After message - Player2:', `x=${this.player2.x}, y=${this.player2.y}`);
+            }
+            
+            this.playersFrozenForLavaMessage = false;
+            this.messageUnfreezeTime = 0;
+            console.log('=== MESSAGE DISAPPEARED - PLAYERS UNFROZEN ===');
+            
             // HARDCODED: Call callback when message disappears (to restore player color)
             if (onComplete) {
                 onComplete();
@@ -1698,6 +2432,10 @@ export class Volcano extends Phaser.Scene {
         this.lavaRiseTimer = 0;
         this.lavaSurvivalChecked = true; // Mark as checked so we don't check again
         this.lavaWarningActive = false; // Stop warning too
+        
+        // HARDCODED: Store who fell before resetting flags
+        const player1Fell = this.player1FellInLava;
+        const player2Fell = this.player2FellInLava;
         
         // HARDCODED: Completely remove lava entities
         if (this.lava) {
@@ -1720,56 +2458,79 @@ export class Volcano extends Phaser.Scene {
             this.lavaWarningText.setVisible(false);
         }
         this.lavaEndTime = this.levelTime;
+        this.messageUnfreezeTime = 0; // Reset message unfreeze time
         
-        // HARDCODED: Return players to start positions after minigame ends
-        this.returnPlayersToStart();
+        // HARDCODED: IMMEDIATELY teleport players to spawn point when lava ends
+        // (player1Fell and player2Fell already stored above)
+        // IMMEDIATELY respawn players at spawn point
+        this.returnPlayersToStart(player1Fell, player2Fell);
         
-        console.log('HARDCODED: Lava removed and stopped rising');
+        // Reset flags for next lava event
+        this.player1LavaDebuff = false;
+        this.player2LavaDebuff = false;
+        this.player1FellInLava = false;
+        this.player2FellInLava = false;
+        this.player1Respawned = true;
+        this.player2Respawned = true;
+        
+        console.log('HARDCODED: Lava removed and stopped rising - players immediately teleported to spawn');
     }
     
-    returnPlayersToStart() {
-        // Return both players to their start positions ABOVE the ground
-        const player1StartX = 400;
-        const spawnY = this.groundTop - this.HARDCODED_PLAYER_HALF_HEIGHT; 
-        const player2StartX = 880;
+    returnPlayersToStart(player1Fell = false, player2Fell = false) {
+        // Simple: Teleport players to original spawn position
+        const player1StartX = this.player1Spawn.x;
+        const spawnY = this.player1Spawn.y;
+        const player2StartX = this.player2Spawn.x;
         
-        // Reset player positions and velocities - DISABLE physics temporarily
+        console.log('=== returnPlayersToStart CALLED ===');
+        console.log('Before teleport - Player1:', this.player1 ? `x=${this.player1.x}, y=${this.player1.y}` : 'null');
+        console.log('Before teleport - Player2:', this.player2 ? `x=${this.player2.x}, y=${this.player2.y}` : 'null');
+        console.log('Target spawn position:', `P1(${player1StartX}, ${spawnY}), P2(${player2StartX}, ${spawnY})`);
+        
+        // CRITICAL: Disable bodies for BOTH players to prevent collision resolution
         if (this.player1) {
-            // Disable body temporarily to prevent ground collision interference
-            this.player1.body.setEnable(false);
+            this.player1.latchedToVine = false;
+            this.player1.climbing = false;
+            this.player1.onVine = null;
+            this.player1.vineLatchCooldown = 0;
+            if (this.player1.vineIndicator) {
+                this.player1.vineIndicator.setVisible(false);
+            }
             this.player1.x = player1StartX;
-            this.player1.y = spawnY; // ABOVE ground
-            this.player1.body.setVelocity(0, 0);
-            // Re-enable body after positioning
-            this.time.delayedCall(50, () => {
-                if (this.player1) {
-                    this.player1.body.setEnable(true);
-                    this.player1.body.setGravityY(this.gravity);
-                    this.player1.body.updateFromGameObject();
-                }
-            });
-        }
-        if (this.player2) {
-            // Disable body temporarily to prevent ground collision interference
-            this.player2.body.setEnable(false);
-            this.player2.x = player2StartX;
-            this.player2.y = spawnY; // ABOVE ground
-            this.player2.body.setVelocity(0, 0);
-            // Re-enable body after positioning
-            this.time.delayedCall(50, () => {
-                if (this.player2) {
-                    this.player2.body.setEnable(true);
-                    this.player2.body.setGravityY(this.gravity);
-                    this.player2.body.updateFromGameObject();
-                }
-            });
+            this.player1.y = spawnY;
+            if (this.player1.body) {
+                this.player1.body.setEnable(false);
+                this.player1.body.x = player1StartX;
+                this.player1.body.y = spawnY;
+                console.log('After teleport - Player1 body:', `x=${this.player1.body.x}, y=${this.player1.body.y}`);
+            }
+            console.log('After teleport - Player1:', `x=${this.player1.x}, y=${this.player1.y}`);
+            this.player1.setVisible(true);
         }
         
-        // HARDCODED: Reset global speed/jump to base values (debuffs are per-player)
+        if (this.player2) {
+            this.player2.latchedToVine = false;
+            this.player2.climbing = false;
+            this.player2.onVine = null;
+            this.player2.vineLatchCooldown = 0;
+            if (this.player2.vineIndicator) {
+                this.player2.vineIndicator.setVisible(false);
+            }
+            this.player2.x = player2StartX;
+            this.player2.y = spawnY;
+            if (this.player2.body) {
+                this.player2.body.setEnable(false);
+                this.player2.body.x = player2StartX;
+                this.player2.body.y = spawnY;
+                console.log('After teleport - Player2 body:', `x=${this.player2.body.x}, y=${this.player2.body.y}`);
+            }
+            console.log('After teleport - Player2:', `x=${this.player2.x}, y=${this.player2.y}`);
+            this.player2.setVisible(true);
+        }
+        
         this.playerSpeed = this.basePlayerSpeed;
         this.jumpVelocity = this.baseJumpVelocity;
-        
-        console.log('HARDCODED: Players returned to start positions - Y:', spawnY, 'Ground top:', this.HARDCODED_GROUND_TOP);
+        console.log('=== returnPlayersToStart COMPLETE ===');
     }
     
     updateFaultlinePuzzle(dt) {
@@ -1799,11 +2560,35 @@ export class Volcano extends Phaser.Scene {
                 scale.indicator.setColor('#FF0000');
             }
             
-            const p1Dist = Phaser.Math.Distance.Between(this.player1.x, this.player1.y, plate.body.x, plate.body.y);
-            const p2Dist = Phaser.Math.Distance.Between(this.player2.x, this.player2.y, plate.body.x, plate.body.y);
-            
-            const p1OnPlate = p1Dist < 120;
-            const p2OnPlate = p2Dist < 120;
+            const plateTop = plate.body.y - plate.body.height / 2;
+            const p1Bottom = this.player1.body ? this.player1.body.bottom : this.player1.y + this.player1.height / 2;
+            const p2Bottom = this.player2.body ? this.player2.body.bottom : this.player2.y + this.player2.height / 2;
+            const p1HorizontalOverlap = Math.abs(this.player1.x - plate.body.x) < (plate.body.width / 2 + this.player1.width / 2);
+            const p2HorizontalOverlap = Math.abs(this.player2.x - plate.body.x) < (plate.body.width / 2 + this.player2.width / 2);
+            const p1OnPlate = p1HorizontalOverlap && p1Bottom >= plateTop - 2 && p1Bottom <= plateTop + 10 && this.player1.body.touching.down;
+            const p2OnPlate = p2HorizontalOverlap && p2Bottom >= plateTop - 2 && p2Bottom <= plateTop + 10 && this.player2.body.touching.down;
+            const shouldPress = this.scalesActive && (p1OnPlate || p2OnPlate);
+            const pressDepth = 8;
+
+            if (shouldPress && !plate.isPressed) {
+                plate.isPressed = true;
+                if (plate.pressTween) plate.pressTween.stop();
+                plate.pressTween = this.tweens.add({
+                    targets: plate.body,
+                    y: plate.originalY + pressDepth,
+                    duration: 500,
+                    ease: 'Sine.easeOut'
+                });
+            } else if (!shouldPress && plate.isPressed) {
+                plate.isPressed = false;
+                if (plate.pressTween) plate.pressTween.stop();
+                plate.pressTween = this.tweens.add({
+                    targets: plate.body,
+                    y: plate.originalY,
+                    duration: 450,
+                    ease: 'Sine.easeInOut'
+                });
+            }
             
             let activePlayer = null;
             if (p1OnPlate && !p2OnPlate) {
@@ -1870,42 +2655,59 @@ export class Volcano extends Phaser.Scene {
     }
 
     updateInfluence(dt) {
+        // HARDCODED: Calculate net influence rate per second for each player (all rates stack)
+        let player1NetRate = 0;
+        let player2NetRate = 0;
+        
+        // 1. Lava event rates (persist until next event, stack)
+        player1NetRate += this.player1InfluenceRate;
+        player2NetRate += this.player2InfluenceRate;
+        
+        // 2. Orb sequence bonus (+3/sec for winner)
+        if (this.orbSequenceOwner === 'Solari') {
+            player1NetRate += this.orbSequenceBonusRate; // +3/sec
+        } else if (this.orbSequenceOwner === 'Umbrae') {
+            player2NetRate += this.orbSequenceBonusRate; // +3/sec
+        }
+        
+        // 3. Fault line scales (+1/sec per scale owned, only when scales are active)
+        if (this.scalesActive && this.scales && this.scales.length) {
+            player1NetRate += (this.solariScaleCount || 0); // +1/sec per scale
+            player2NetRate += (this.umbraeScaleCount || 0); // +1/sec per scale
+        }
+        
+        // 4. Legacy influence reward system (if still used)
         if (this.influenceReward) {
             if (!this.influenceReward.endTime || this.levelTime <= this.influenceReward.endTime) {
-                const amount = this.influenceReward.rate * dt;
-                this.player1Influence += amount;
-                this.player2Influence += amount;
+                player1NetRate += this.influenceReward.rate;
+                player2NetRate += this.influenceReward.rate;
             } else {
                 this.influenceReward = null;
             }
         }
         
-        this.influencePenalty = null;
+        // HARDCODED: Apply net rates per second (rates stack, so we sum them all)
+        this.player1Influence += player1NetRate * dt;
+        this.player2Influence += player2NetRate * dt;
         
-        if (this.orbSequenceOwner === 'Solari') {
-            this.player1Influence += this.orbSequenceBonusRate * dt;
-        } else if (this.orbSequenceOwner === 'Umbrae') {
-            this.player2Influence += this.orbSequenceBonusRate * dt;
-        }
-        
-        if (this.scalesActive && this.scales && this.scales.length) {
-            const solariFromScales = (this.solariScaleCount || 0) * dt;
-            const umbraeFromScales = (this.umbraeScaleCount || 0) * dt;
-            this.player1Influence += solariFromScales;
-            this.player2Influence += umbraeFromScales;
-        }
-        
+        // Clamp influence to valid range
         this.player1Influence = Phaser.Math.Clamp(this.player1Influence, 0, this.maxInfluence);
         this.player2Influence = Phaser.Math.Clamp(this.player2Influence, 0, this.maxInfluence);
         
-        const p1BarWidth = (this.player1Influence / this.maxInfluence) * 400;
-        const p2BarWidth = (this.player2Influence / this.maxInfluence) * 400;
+        const p1BarWidth = (this.player1Influence / this.maxInfluence) * this.player1BarUi.maxWidth;
+        const p2BarWidth = (this.player2Influence / this.maxInfluence) * this.player2BarUi.maxWidth;
         
-        this.player1BarFill.setSize(p1BarWidth, 25);
-        this.player2BarFill.setSize(p2BarWidth, 25);
+        this.player1BarUi.fill.width = p1BarWidth;
+        this.player2BarUi.fill.width = p2BarWidth;
         
-        this.player1InfluenceText.setText(`${Math.floor(this.player1Influence)}/500`);
-        this.player2InfluenceText.setText(`${Math.floor(this.player2Influence)}/500`);
+        if (Math.floor(this.player1Influence) > (this.player1BarUi.lastValue || 0)) {
+            this.tweens.add({ targets: this.player1BarUi.glow, alpha: 0.35, duration: 200, yoyo: true });
+            this.player1BarUi.lastValue = Math.floor(this.player1Influence);
+        }
+        if (Math.floor(this.player2Influence) > (this.player2BarUi.lastValue || 0)) {
+            this.tweens.add({ targets: this.player2BarUi.glow, alpha: 0.35, duration: 200, yoyo: true });
+            this.player2BarUi.lastValue = Math.floor(this.player2Influence);
+        }
         
         const solariInt = Math.floor(this.player1Influence);
         const umbraeInt = Math.floor(this.player2Influence);

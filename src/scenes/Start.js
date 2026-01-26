@@ -8,7 +8,7 @@ export class Start extends Phaser.Scene {
     }
 
     preload() {
-        this.load.image('center-tv-image', 'assets/image.png');
+        // No assets to load for now - using simple shapes
     }
 
     create() {
@@ -33,6 +33,7 @@ export class Start extends Phaser.Scene {
         try {
             TextureGenerator.createAllTextures(this);
             TempleGenerator.createTemple(this);
+            console.log('TempleGenerator.createTemple called, texture exists:', this.textures.exists('temple-main'));
             console.log('All textures created, temple should be ready');
         } catch (error) {
             console.error('Error creating textures:', error);
@@ -98,7 +99,13 @@ export class Start extends Phaser.Scene {
             this.bgRects.push(starSprite);
         });
         
+        if (!this.textures.exists('temple-main')) {
+            TempleGenerator.createTemple(this);
+            console.log('TempleGenerator.createTemple called from createBackground, texture exists:', this.textures.exists('temple-main'));
+        }
+
         if (this.textures.exists('temple-main')) {
+            console.log('Drawing temple-main image in createBackground');
             const templeMain = this.add.image(320, 400, 'temple-main');
             templeMain.setOrigin(0.5, 1); 
             templeMain.setDepth(-200); 
@@ -189,6 +196,105 @@ export class Start extends Phaser.Scene {
         }
         
         this.bgRects.push(this.add.rectangle(640, 610, 1280, 220, 0x1a1a1a)); 
+
+        // Add pixel-art polygon mossy rocks with natural, irregular, tufted moss
+        for (let i = 0; i < 5; i++) {
+            const x = 800 + i * 60 + Math.floor(Math.random() * 8);
+            const y = 400 + Math.floor(Math.random() * 8);
+            const scale = 2.2 + (i % 2 === 0 ? 0.18 : -0.12) + Math.random() * 0.15;
+            const rock = this.add.graphics();
+            rock.setDepth(-5);
+            // --- Main polygonal rock shape ---
+            rock.lineStyle(3, 0x181818, 1); // black outline
+            rock.beginPath();
+            rock.moveTo(-32 * scale, 18 * scale);
+            rock.lineTo(-20 * scale, -14 * scale);
+            rock.lineTo(-8 * scale, -36 * scale);
+            rock.lineTo(0, -44 * scale);
+            rock.lineTo(12 * scale, -38 * scale);
+            rock.lineTo(28 * scale, -18 * scale);
+            rock.lineTo(38 * scale, 10 * scale);
+            rock.lineTo(24 * scale, 28 * scale);
+            rock.lineTo(-10 * scale, 28 * scale);
+            rock.closePath();
+            rock.fillStyle(0x8b7a6b, 1);
+            rock.fillPath();
+            rock.strokePath();
+            // --- Natural, irregular moss (darker green, with drips and tufts) ---
+            rock.lineStyle(0, 0, 0);
+            rock.beginPath();
+            rock.moveTo(-20 * scale, -14 * scale);
+            rock.lineTo(-13 * scale, -30 * scale);
+            rock.lineTo(-8 * scale, -36 * scale);
+            rock.lineTo(0, -44 * scale);
+            rock.lineTo(10 * scale, -40 * scale);
+            rock.lineTo(13 * scale, -35 * scale);
+            // Moss drips
+            rock.lineTo(8 * scale, -28 * scale);
+            rock.lineTo(12 * scale, -22 * scale);
+            rock.lineTo(6 * scale, -18 * scale);
+            rock.lineTo(4 * scale, -25 * scale);
+            rock.lineTo(-3 * scale, -18 * scale);
+            rock.lineTo(-6 * scale, -25 * scale);
+            rock.lineTo(-10 * scale, -18 * scale);
+            rock.lineTo(-12 * scale, -22 * scale);
+            rock.lineTo(-15 * scale, -16 * scale);
+            rock.lineTo(-20 * scale, -14 * scale);
+            rock.closePath();
+            rock.fillStyle(0x234013, 1);
+            rock.fillPath();
+            // Moss tuft left
+            rock.beginPath();
+            rock.moveTo(-18 * scale, 2 * scale);
+            rock.lineTo(-14 * scale, -4 * scale);
+            rock.lineTo(-10 * scale, 4 * scale);
+            rock.lineTo(-16 * scale, 8 * scale);
+            rock.closePath();
+            rock.fillStyle(0x234013, 1);
+            rock.fillPath();
+            // Moss tuft right
+            rock.beginPath();
+            rock.moveTo(18 * scale, 4 * scale);
+            rock.lineTo(22 * scale, -2 * scale);
+            rock.lineTo(26 * scale, 6 * scale);
+            rock.lineTo(20 * scale, 10 * scale);
+            rock.closePath();
+            rock.fillStyle(0x234013, 1);
+            rock.fillPath();
+            // Small moss drips
+            rock.beginPath();
+            rock.moveTo(2 * scale, -10 * scale);
+            rock.lineTo(4 * scale, -18 * scale);
+            rock.lineTo(8 * scale, -10 * scale);
+            rock.lineTo(2 * scale, -10 * scale);
+            rock.closePath();
+            rock.fillStyle(0x234013, 1);
+            rock.fillPath();
+            // --- Moss highlight (lighter, irregular) ---
+            rock.beginPath();
+            rock.moveTo(-8 * scale, -32 * scale);
+            rock.lineTo(-2 * scale, -38 * scale);
+            rock.lineTo(6 * scale, -34 * scale);
+            rock.lineTo(2 * scale, -28 * scale);
+            rock.lineTo(-8 * scale, -32 * scale);
+            rock.closePath();
+            rock.fillStyle(0x3d6b1f, 1);
+            rock.fillPath();
+            // --- Cracks (pixel lines) ---
+            rock.lineStyle(2, 0x2d2218, 1);
+            rock.beginPath();
+            rock.moveTo(-8 * scale, -20 * scale);
+            rock.lineTo(-2 * scale, -6 * scale);
+            rock.strokePath();
+            rock.beginPath();
+            rock.moveTo(8 * scale, -12 * scale);
+            rock.lineTo(10 * scale, 6 * scale);
+            rock.strokePath();
+            // Position
+            rock.x = x;
+            rock.y = y;
+            this.bgRects.push(rock);
+        }
         
         this.bgRects.forEach((bg, index) => {
             if (bg && bg.texture) {
@@ -641,12 +747,32 @@ export class Start extends Phaser.Scene {
         
         this.tvElementsP2.push(this.add.text(centerX + 320, 530, 'UMBRAE TV', { fontSize: '16px', fill: '#8B00FF', fontStyle: 'bold', resolution: 2 }).setOrigin(0.5, 0.5).setDepth(13));
         
-        this.centerTvImage = this.add.image(centerX, 600, 'center-tv-image');
-        this.centerTvImage.setOrigin(0.5, 0.5);
-        this.centerTvImage.setDepth(13);
-        this.centerTvImage.setScale(0.5);
-        this.tvElementsP1.push(this.centerTvImage);
-        this.tvElementsP2.push(this.centerTvImage);
+        // User positioning rectangle
+        const myRect = this.add.graphics();
+        myRect.setDepth(13);
+        // Draw grey rectangle
+        const rackRect = this.add.graphics();
+        rackRect.setDepth(13);
+        rackRect.fillStyle(0x444851, 1);
+        rackRect.fillRect(592, 477, 97, 242);
+        rackRect.lineStyle(6, 0x111113, 1);
+        rackRect.strokeRect(592, 477, 97, 242);
+        // Draw animated fiery orb (glow + detail)
+        this.orbGlow = this.add.graphics();
+        this.orbGlow.setDepth(14);
+        this.orbDetail = this.add.graphics();
+        this.orbDetail.setDepth(15);
+        this.orbX = 640;
+        this.orbY = 597;
+        this.orbRadius = 22;
+        // Initial draw (animation in update)
+        this.orbGlow.fillStyle(0xffa500, 0.7);
+        this.orbGlow.fillCircle(this.orbX, this.orbY, 32);
+        this.orbDetail.fillStyle(0xffb300, 1);
+        this.orbDetail.fillCircle(this.orbX, this.orbY, this.orbRadius);
+        // (no other code changed)
+        // (no other code changed)
+        // (no other code changed)
     }
 
     createPlayers() {
@@ -1846,6 +1972,61 @@ export class Start extends Phaser.Scene {
     }
 
     update() {
+        // Animate fiery orb with glow and sun-like detail
+        if (this.orbGlow && this.orbDetail) {
+            let color = 0xff6600; // saturated fiery orange (neutral)
+            let glowColor = 0xff4400;
+            if (this.player1Influence > this.player2Influence) {
+                color = 0xfff200; // bright yellow
+                glowColor = 0xfff200;
+            } else if (this.player2Influence > this.player1Influence) {
+                color = 0x9e2fff; // bright purple
+                glowColor = 0x9e2fff;
+            }
+            // Animate glow
+            const t = this.time.now / 400;
+            const glowAlpha = 0.5 + 0.2 * Math.sin(t);
+            const glowRadius = 32 + 2 * Math.cos(t * 0.7);
+            this.orbGlow.clear();
+            this.orbGlow.fillStyle(glowColor, glowAlpha);
+            this.orbGlow.fillCircle(this.orbX, this.orbY, glowRadius);
+            // Animate orb core
+            this.orbDetail.clear();
+            this.orbDetail.fillStyle(color, 1);
+            this.orbDetail.fillCircle(this.orbX, this.orbY, this.orbRadius);
+            // Add animated starburst rays
+            const rayCount = 20;
+            for (let i = 0; i < rayCount; i++) {
+                const angle = (Math.PI * 2 * i) / rayCount;
+                // Animate ray length and thickness
+                const baseLen = this.orbRadius + 5;
+                const rayLen = baseLen + 12 + 6 * Math.sin(t + i);
+                const x1 = this.orbX + Math.cos(angle) * (this.orbRadius - 2);
+                const y1 = this.orbY + Math.sin(angle) * (this.orbRadius - 2);
+                const x2 = this.orbX + Math.cos(angle) * rayLen;
+                const y2 = this.orbY + Math.sin(angle) * rayLen;
+                this.orbDetail.lineStyle(3, color, 0.7);
+                this.orbDetail.beginPath();
+                this.orbDetail.moveTo(x1, y1);
+                this.orbDetail.lineTo(x2, y2);
+                this.orbDetail.strokePath();
+            }
+            // Add animated inner sun lines (shorter, for detail)
+            const innerLineCount = 10;
+            for (let i = 0; i < innerLineCount; i++) {
+                const angle = (Math.PI * 2 * i) / innerLineCount;
+                const len = this.orbRadius - 3 + 2 * Math.sin(t * 1.2 + i * 1.5);
+                const x1 = this.orbX + Math.cos(angle) * (len - 7);
+                const y1 = this.orbY + Math.sin(angle) * (len - 7);
+                const x2 = this.orbX + Math.cos(angle) * len;
+                const y2 = this.orbY + Math.sin(angle) * len;
+                this.orbDetail.lineStyle(2, color, 0.7);
+                this.orbDetail.beginPath();
+                this.orbDetail.moveTo(x1, y1);
+                this.orbDetail.lineTo(x2, y2);
+                this.orbDetail.strokePath();
+            }
+        }
         if (this.playersFrozen) {
             // Stop movement during countdown
             if (this.player1 && this.player1.body) this.player1.body.setVelocity(0, 0);
